@@ -3,8 +3,16 @@
  * Every role signs in through the real form against the real API.
  */
 
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { expectNoA11yViolations, expectSignedInAs, signIn, TOKENS, type Role } from "./support";
+
+/**
+ * The sign-in form's refusal. A production build also renders Next.js's hidden
+ * route announcer with role="alert", so match the form's alert by its text.
+ */
+function refusal(page: Page) {
+  return page.getByRole("alert").filter({ hasText: /token/i });
+}
 
 test("an unauthenticated visit is sent to sign in", async ({ page }) => {
   await page.goto("/");
@@ -18,7 +26,7 @@ test("a wrong token is refused with a visible reason", async ({ page }) => {
   await page.getByRole("radio", { name: /Player/ }).check();
   await page.getByLabel("Role token").fill("not-a-real-token");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(refusal(page)).toBeVisible();
   await expect(page).toHaveURL(/\/login/);
 });
 
@@ -27,7 +35,7 @@ test("a token for another role is refused", async ({ page }) => {
   await page.getByRole("radio", { name: /Coach/ }).check();
   await page.getByLabel("Role token").fill(TOKENS.player);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(refusal(page)).toBeVisible();
 });
 
 for (const role of ["player", "parent", "coach"] as const satisfies readonly Role[]) {

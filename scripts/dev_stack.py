@@ -12,6 +12,7 @@ Usage::
     uv run scripts/dev_stack.py              # API :8000 + seeded demo + web :3000
     uv run scripts/dev_stack.py --api-only   # API only (e.g. for `pnpm dev` elsewhere)
     uv run scripts/dev_stack.py --no-seed    # empty database: exercise empty states
+    uv run scripts/dev_stack.py --web-mode prod   # production build + next start
 
 Sign in to the dashboard with one of the printed role tokens. They are fixed
 development values, never deployment secrets.
@@ -43,7 +44,7 @@ import threading
 import uuid
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -64,9 +65,9 @@ from cricai_data.enums import (
     Shot,
 )
 from cricai_data.lifecycle import SessionState
-from cricai_data.models import BallEvent, BallTag, Clip, Finding, Report
+from cricai_data.models import BallEvent, BallTag, Base, Clip, Finding, Report
 from cricai_data.models import Session as SessionRow
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI, Header, HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session as OrmSession
@@ -346,6 +347,31 @@ def seed_demo(app: FastAPI) -> SeedSummary:
     )
 
 
+RESET_PATH = "/__dev/reset"
+
+
+def mount_dev_reset(app: FastAPI) -> None:
+    """Add POST /__dev/reset: wipe the in-memory database and reseed the demo.
+
+    DEVELOPMENT ONLY. It exists so end-to-end journeys that change data (a coach
+    publishing a report) start from the same demo every time. It is mounted by
+    this script alone, never by ``create_app``, so the product API and its
+    OpenAPI schema never contain it. Parent token required.
+    """
+    router = APIRouter()
+
+    @router.post(RESET_PATH, include_in_schema=False)
+    def reset(authorization: str = Header(default="")) -> dict[str, str]:
+        if authorization != f"Bearer {PARENT_TOKEN}":
+            raise HTTPException(status_code=401, detail="dev reset needs the dev parent token")
+        engine: Engine = app.state.engine
+        Base.metadata.drop_all(engine)
+        create_all(engine)
+        return asdict(seed_demo(app))
+
+    app.include_router(router)
+
+
 def web_env(api_base: str, base: dict[str, str] | None = None) -> dict[str, str]:
     """Environment for `next dev`: both the proxy (F2) and legacy (pre-F2b) conventions."""
     env = dict(os.environ if base is None else base)
@@ -353,6 +379,21 @@ def web_env(api_base: str, base: dict[str, str] | None = None) -> dict[str, str]
     env["NEXT_PUBLIC_API_BASE_URL"] = api_base
     env.setdefault("NEXT_TELEMETRY_DISABLED", "1")
     return env
+
+
+def web_commands(pnpm: str, mode: str, host: str, port: int) -> list[list[str]]:
+    """The commands that serve the dashboard: `next dev`, or a production build + `next start`.
+
+    Production mode is what the lab tablet runs and what end-to-end journeys
+    use: pages are compiled once up front instead of on first visit, which on
+    a busy machine can take over a minute per route under `next dev`.
+    """
+    serve = ["--port", str(port), "--hostname", host]
+    if mode == "dev":
+        return [[pnpm, "dev", *serve]]
+    if mode == "prod":
+        return [[pnpm, "build"], [pnpm, "start", *serve]]
+    raise ValueError(f"unknown web mode {mode!r} (expected 'dev' or 'prod')")
 
 
 def banner(api_base: str, web_base: str | None, summary: SeedSummary | None) -> str:
@@ -375,6 +416,7 @@ def banner(api_base: str, web_base: str | None, summary: SeedSummary | None) -> 
             f"  Reports   {summary.published_report_id} (published)",
             f"            {summary.draft_report_id} (draft, in the coach review queue)",
         ]
+    lines.append(f"  Reseed    POST {api_base}{RESET_PATH} (parent token)")
     lines.append("  Ctrl+C stops everything.")
     return "\n".join(lines) + "\n"
 
@@ -386,10 +428,17 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - process or
     parser.add_argument("--web-port", type=int, default=3000)
     parser.add_argument("--api-only", action="store_true")
     parser.add_argument("--no-seed", action="store_true")
+    parser.add_argument(
+        "--web-mode",
+        choices=("dev", "prod"),
+        default="dev",
+        help="dev: next dev (hot reload); prod: next build then next start",
+    )
     args = parser.parse_args(argv)
 
     storage = Path(tempfile.mkdtemp(prefix="cricai-dev-"))
     app = make_app(storage, make_engine())
+    mount_dev_reset(app)
     summary = None if args.no_seed else seed_demo(app)
     api_base = f"http://{args.host}:{args.api_port}"
 
@@ -408,11 +457,13 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - process or
             server.should_exit = True
             return 2
         web_base = f"http://{args.host}:{args.web_port}"
-        web = subprocess.Popen(
-            [pnpm, "dev", "--port", str(args.web_port), "--hostname", args.host],
-            cwd=WEB_DIR,
-            env=web_env(api_base),
-        )
+        *prepare, serve = web_commands(pnpm, args.web_mode, args.host, args.web_port)
+        for command in prepare:
+            if subprocess.run(command, cwd=WEB_DIR, env=web_env(api_base), check=False).returncode:
+                print(f"{' '.join(command[1:])} failed", file=sys.stderr)
+                server.should_exit = True
+                return 1
+        web = subprocess.Popen(serve, cwd=WEB_DIR, env=web_env(api_base))
     print(banner(api_base, web_base, summary), flush=True)
 
     stop = threading.Event()

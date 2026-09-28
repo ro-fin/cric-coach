@@ -114,3 +114,53 @@ def test_banner_names_tokens_and_seed(seeded: tuple[TestClient, object]) -> None
     empty = dev_stack.banner("http://a:1", None, None)
     assert "EMPTY" in empty
     assert "Dashboard" not in empty
+
+
+def test_dev_reset_restores_the_demo_after_a_change(tmp_path: Path) -> None:
+    app = dev_stack.make_app(tmp_path / "storage", dev_stack.make_engine())
+    dev_stack.mount_dev_reset(app)
+    first = dev_stack.seed_demo(app)
+    client = TestClient(app)
+    published = client.post(
+        f"/reports/{first.draft_report_id}/publish", headers=dev_stack._auth(dev_stack.COACH_TOKEN)
+    )
+    assert published.json()["status"] == "published"
+    assert _get(client, "/settings/review-queue", dev_stack.COACH_TOKEN) == []
+
+    assert client.post(dev_stack.RESET_PATH).status_code == 401
+    wrong = client.post(dev_stack.RESET_PATH, headers=dev_stack._auth(dev_stack.COACH_TOKEN))
+    assert wrong.status_code == 401
+    reset = client.post(dev_stack.RESET_PATH, headers=dev_stack._auth(dev_stack.PARENT_TOKEN))
+    assert reset.status_code == 200
+    summary = reset.json()
+    assert set(summary) == {
+        "player_id",
+        "analyzed_session_id",
+        "degraded_session_id",
+        "published_report_id",
+        "draft_report_id",
+    }
+    queue = _get(client, "/settings/review-queue", dev_stack.COACH_TOKEN)
+    assert [item["id"] for item in queue] == [summary["draft_report_id"]]
+    page = _get(client, "/sessions", dev_stack.PARENT_TOKEN)
+    assert isinstance(page, dict) and page["total"] == 2
+
+
+def test_dev_reset_is_not_part_of_the_product_api(tmp_path: Path) -> None:
+    app = dev_stack.make_app(tmp_path / "storage", dev_stack.make_engine())
+    assert dev_stack.RESET_PATH not in app.openapi()["paths"]
+    dev_stack.mount_dev_reset(app)
+    app.openapi_schema = None
+    assert dev_stack.RESET_PATH not in app.openapi()["paths"]
+
+
+def test_web_commands_for_each_mode() -> None:
+    assert dev_stack.web_commands("pnpm", "dev", "127.0.0.1", 3100) == [
+        ["pnpm", "dev", "--port", "3100", "--hostname", "127.0.0.1"]
+    ]
+    assert dev_stack.web_commands("pnpm", "prod", "0.0.0.0", 3000) == [
+        ["pnpm", "build"],
+        ["pnpm", "start", "--port", "3000", "--hostname", "0.0.0.0"],
+    ]
+    with pytest.raises(ValueError, match="unknown web mode"):
+        dev_stack.web_commands("pnpm", "staging", "h", 1)

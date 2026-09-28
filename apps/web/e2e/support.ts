@@ -4,9 +4,12 @@
  */
 
 import { join } from "node:path";
-import { expect, type Page } from "@playwright/test";
+import { expect, test as base, type Page } from "@playwright/test";
 
 export type Role = "parent" | "coach" | "player";
+
+/** The dev-stack API (see playwright.config.ts); used only for the dev reset route. */
+export const API_URL = process.env.E2E_API_URL ?? "http://127.0.0.1:8100";
 
 export const TOKENS: Record<Role, string> = {
   parent: "dev-parent-token",
@@ -61,3 +64,29 @@ export async function expectNoA11yViolations(page: Page): Promise<void> {
   });
   expect(violations, `axe violations: ${violations.join(" | ")}`).toEqual([]);
 }
+
+/** IDs of the freshly seeded demo lab (scripts/dev_stack.py SeedSummary). */
+export interface Demo {
+  player_id: string;
+  analyzed_session_id: string;
+  degraded_session_id: string;
+  published_report_id: string;
+  draft_report_id: string;
+}
+
+/**
+ * `test` with a `demo` fixture: every journey that asks for it starts from a
+ * freshly reseeded demo lab (POST /__dev/reset, dev stack only), so a journey
+ * that changes data (a coach publishing) never leaks into the next one.
+ */
+export const test = base.extend<{ demo: Demo }>({
+  // The fixture callback is named `provide`, not `use`, so the React hooks lint
+  // does not mistake it for React.use.
+  demo: async ({ request }, provide) => {
+    const response = await request.post(`${API_URL}/__dev/reset`, {
+      headers: { Authorization: `Bearer ${TOKENS.parent}` },
+    });
+    expect(response.ok(), `dev reset failed: ${response.status()}`).toBe(true);
+    await provide((await response.json()) as Demo);
+  },
+});

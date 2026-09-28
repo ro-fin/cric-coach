@@ -2,7 +2,8 @@
  * End-to-end journeys (T1, phase-8-plan.md "End-to-end").
  *
  * `pnpm e2e` boots scripts/dev_stack.py (the real cricai_api on in-memory
- * SQLite with the seeded demo lab, plus `next dev`) on its own ports, then runs
+ * SQLite with the seeded demo lab, plus a PRODUCTION build served by `next start`,
+ * the same thing the lab tablet runs) on its own ports, then runs
  * every journey on a tablet and a desktop viewport. The stack is torn down
  * afterwards. Locally an already-running stack on the same ports is reused.
  *
@@ -20,7 +21,15 @@ const RUN_DIR = join(__dirname, "..", "..", ".cricai-run", "e2e");
 
 const API_PORT = 8100;
 const WEB_PORT = 3100;
-const HOST = "127.0.0.1";
+const HOST = "127.0.0.1"; // bind address for the API and the web server
+// The browser uses "localhost": Next.js normalizes every loopback address in
+// request.nextUrl to "localhost", so middleware redirects from 127.0.0.1 land on
+// localhost and the session cookie would be split across two hosts.
+const BROWSER_HOST = "localhost";
+
+// Point the journeys at an already-running stack instead of booting one:
+//   E2E_WEB_URL=http://127.0.0.1:3000 E2E_API_URL=http://127.0.0.1:8000 pnpm e2e
+const EXTERNAL_WEB = process.env.E2E_WEB_URL;
 
 export default defineConfig({
   testDir: "./e2e",
@@ -32,7 +41,7 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   reporter: process.env.CI ? [["list"], ["html", { open: "never", outputFolder: join(RUN_DIR, "report") }]] : "list",
   use: {
-    baseURL: `http://${HOST}:${WEB_PORT}`,
+    baseURL: EXTERNAL_WEB ?? `http://${BROWSER_HOST}:${WEB_PORT}`,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
@@ -46,13 +55,15 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } },
     },
   ],
-  webServer: {
-    command: `uv run scripts/dev_stack.py --host ${HOST} --api-port ${API_PORT} --web-port ${WEB_PORT}`,
-    cwd: "../..",
-    url: `http://${HOST}:${WEB_PORT}/login`,
-    reuseExistingServer: !process.env.CI,
-    timeout: 240_000, // first `next dev` compile on a cold machine
-    stdout: "pipe",
-    stderr: "pipe",
-  },
+  webServer: EXTERNAL_WEB
+    ? undefined
+    : {
+        command: `uv run scripts/dev_stack.py --web-mode prod --host ${HOST} --api-port ${API_PORT} --web-port ${WEB_PORT}`,
+        cwd: "../..",
+        url: `http://${HOST}:${WEB_PORT}/login`,
+        reuseExistingServer: !process.env.CI,
+        timeout: 600_000, // includes `next build` on a shared, busy machine
+        stdout: "pipe",
+        stderr: "pipe",
+      },
 });
