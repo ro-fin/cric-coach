@@ -101,12 +101,23 @@ export interface WellnessStateOut {
   pain_reports_in_window: number;
 }
 
+/** GET /players items (cricai_api.routers.players.PlayerOut). The server
+ * hides guest players from the player role. */
+export interface PlayerOut {
+  id: string;
+  name: string;
+  birthdate: string;
+  handedness: "right" | "left";
+  is_guest: boolean;
+}
+
 export interface CheckinRange {
   start?: string;
   end?: string;
 }
 
 export interface WellnessApi {
+  listPlayers(): Promise<PlayerOut[]>;
   listCheckins(playerId: string, range?: CheckinRange): Promise<CheckinOut[]>;
   createCheckin(playerId: string, body: CheckinIn): Promise<CheckinOut>;
   clearPain(playerId: string, checkinId: string, note: string): Promise<ClearanceOut>;
@@ -115,6 +126,7 @@ export interface WellnessApi {
 
 export function createWellnessApi(config: ApiConfig = defaultConfig()): WellnessApi {
   return {
+    listPlayers: () => request<PlayerOut[]>(config, "/players"),
     listCheckins: (playerId, range = {}) =>
       request<CheckinOut[]>(config, `/wellness/${playerId}/checkins`, {
         query: { start: range.start, end: range.end },

@@ -8,6 +8,7 @@
 import type { Role } from "../pipeline/access";
 import {
   type CheckinIn,
+  SORENESS_BODY_KEYS,
   type CheckinOut,
   ENERGY_MAX,
   ENERGY_MIN,
@@ -104,4 +105,33 @@ export function openPainCheckins(
 /** "shoulder_right" -> "shoulder right". */
 export function bodyLabel(key: string): string {
   return key.replace(/_/g, " ");
+}
+
+/** Today's date in the viewer's own calendar, as the API's YYYY-MM-DD. */
+export function todayIso(now: Date = new Date()): string {
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
+/** The API lists check-ins oldest first; the history reads newest first. */
+export function newestFirst(checkins: readonly CheckinOut[]): CheckinOut[] {
+  return [...checkins].reverse();
+}
+
+/** Soreness entries in head-to-foot order; unknown keys keep served order at the end. */
+export function sorenessEntries(soreness: Record<string, number>): [string, number][] {
+  const rank = (key: string) => {
+    const index = SORENESS_BODY_KEYS.indexOf(key);
+    return index === -1 ? SORENESS_BODY_KEYS.length : index;
+  };
+  return Object.entries(soreness).sort(([a], [b]) => rank(a) - rank(b));
+}
+
+/** Default player: the one named in the URL if known, else the first served. */
+export function pickPlayer(players: readonly { id: string }[], wanted: string | null): string | null {
+  if (wanted !== null && players.some((player) => player.id === wanted)) {
+    return wanted;
+  }
+  return players[0]?.id ?? null;
 }

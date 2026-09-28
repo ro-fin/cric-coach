@@ -5,7 +5,11 @@ import {
   canClear,
   checkinProblems,
   emptyDraft,
+  newestFirst,
   openPainCheckins,
+  pickPlayer,
+  sorenessEntries,
+  todayIso,
   playerIdFromSearch,
   toCheckinIn,
   WELLNESS_ROLES,
@@ -108,5 +112,34 @@ describe("helpers", () => {
 
   it("labels body keys for people", () => {
     expect(bodyLabel("shoulder_right")).toBe("shoulder right");
+  });
+});
+
+describe("display helpers", () => {
+  it("formats today as the API date", () => {
+    expect(todayIso(new Date(2026, 8, 5))).toBe("2026-09-05");
+    expect(todayIso()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("lists history newest first without touching the input", () => {
+    const rows = [checkin({ id: "a" }), checkin({ id: "b" })];
+    expect(newestFirst(rows).map((row) => row.id)).toEqual(["b", "a"]);
+    expect(rows[0].id).toBe("a");
+  });
+
+  it("orders soreness head to foot, unknown keys last", () => {
+    expect(sorenessEntries({ foot_left: 1, zzz: 2, neck: 3 })).toEqual([
+      ["neck", 3],
+      ["foot_left", 1],
+      ["zzz", 2],
+    ]);
+  });
+
+  it("picks the wanted player when known, else the first", () => {
+    const players = [{ id: "p1" }, { id: "p2" }];
+    expect(pickPlayer(players, "p2")).toBe("p2");
+    expect(pickPlayer(players, "nope")).toBe("p1");
+    expect(pickPlayer(players, null)).toBe("p1");
+    expect(pickPlayer([], null)).toBeNull();
   });
 });
