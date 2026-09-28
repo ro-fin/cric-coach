@@ -1,7 +1,7 @@
 PY_PKGS := packages/data packages/vision packages/coaching apps/api apps/worker
 COV_MODS := cricai_data cricai_vision cricai_coaching cricai_api cricai_worker
 
-.PHONY: setup lint typecheck test test-unit test-integration safety golden coverage seed web-lint web-test web-build contract contract-update check all
+.PHONY: setup lint typecheck test test-unit test-integration safety golden coverage seed web-lint web-test web-build contract contract-update web-e2e dev check all
 
 setup:
 	uv sync --all-packages
@@ -52,6 +52,16 @@ web-test:
 web-build:
 	cd apps/web && pnpm build
 
+# End-to-end journeys (Phase 8): boots scripts/dev_stack.py (real API on
+# in-memory SQLite + seeded demo + next dev) and runs Playwright on a tablet and
+# a desktop viewport. One-time: cd apps/web && pnpm exec playwright install chromium
+web-e2e:
+	cd apps/web && pnpm e2e
+
+# Local dashboard development against the seeded demo API.
+dev:
+	uv run scripts/dev_stack.py
+
 # API contract (Phase 8): the checked-in OpenAPI dump must be current; the web
 # contract test (part of web-test) then pins lib/api.ts to it.
 contract:
@@ -62,4 +72,4 @@ contract-update:
 
 check: lint typecheck contract test-unit web-lint web-test
 
-all: check test-integration safety golden web-build
+all: check test-integration safety golden web-build web-e2e
