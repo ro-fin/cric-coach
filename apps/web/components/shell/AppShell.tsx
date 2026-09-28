@@ -1,12 +1,13 @@
 "use client";
 
-import { Ellipsis, UserRound } from "lucide-react";
+import { Ellipsis, LogOut, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { Dialog } from "@/components/ui/Dialog";
 import { useRole } from "@/lib/auth/role";
 import { ROLE_LABELS } from "@/lib/auth/roles";
+import { hardNavigate } from "@/lib/browser";
 import { cn } from "@/lib/cn";
 import { isActive, navItemsFor, type NavItem } from "./nav";
 import { ThemeToggle } from "./ThemeToggle";
@@ -44,13 +45,33 @@ function NavLink({
   );
 }
 
+async function signOut() {
+  try {
+    await fetch("/api/cricai/_session", { method: "DELETE" });
+  } finally {
+    hardNavigate("/login");
+  }
+}
+
 function RoleChip() {
   const role = useRole();
   return (
-    <p className="flex items-center gap-2 text-sm text-ink-muted">
-      <UserRound aria-hidden="true" className="size-5" />
-      {role === null ? "Not signed in" : `Signed in as ${ROLE_LABELS[role]}`}
-    </p>
+    <div className="flex flex-wrap items-center gap-2 text-sm text-ink-muted">
+      <p className="flex items-center gap-2">
+        <UserRound aria-hidden="true" className="size-5" />
+        {role === null ? "Not signed in" : `Signed in as ${ROLE_LABELS[role]}`}
+      </p>
+      {role !== null && (
+        <button
+          type="button"
+          onClick={() => void signOut().catch(() => undefined)}
+          className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-lg px-2 font-semibold text-ink hover:bg-surface-raised"
+        >
+          <LogOut aria-hidden="true" className="size-5" />
+          <span className="sr-only lg:not-sr-only">Sign out</span>
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -69,6 +90,18 @@ export function AppShell({ children }: { children: ReactNode }) {
   const tabItems = overflow ? items.slice(0, TAB_BAR_SLOTS) : items;
   const moreItems = overflow ? items.slice(TAB_BAR_SLOTS) : [];
   const moreActive = moreItems.some((item) => isActive(item.href, pathname));
+
+  if (pathname === "/login") {
+    // Signing in: no navigation to pages that would only bounce back here.
+    return (
+      <div className="min-h-screen bg-bg px-4 text-ink">
+        <div className="flex justify-end pt-2">
+          <ThemeToggle />
+        </div>
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-bg text-ink lg:flex">

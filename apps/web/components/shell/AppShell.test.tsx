@@ -21,6 +21,9 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+const browser = vi.hoisted(() => ({ hardNavigate: vi.fn() }));
+vi.mock("@/lib/browser", () => browser);
+
 function renderShell(role: Role | null, pathname: string | null = "/") {
   navigation.pathname = pathname;
   return render(
@@ -105,5 +108,39 @@ describe("AppShell", () => {
     expect(within(tabs).getAllByRole("link")).toHaveLength(5);
     expect(within(tabs).queryByRole("button", { name: "More" })).toBeNull();
     expect(within(tabs).getByRole("link", { name: "Today" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("shows only the page and the theme toggle on /login", () => {
+    renderShell(null, "/login");
+    expect(screen.getByRole("heading", { name: "Page" })).toBeInTheDocument();
+    expect(screen.queryByRole("navigation")).toBeNull();
+    expect(screen.getByRole("button", { name: "Dark theme" })).toBeInTheDocument();
+  });
+
+  it("signs out through the session endpoint, then reloads to /login", async () => {
+    const fetchFn = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchFn);
+    renderShell("coach");
+    fireEvent.click(screen.getAllByRole("button", { name: "Sign out" })[0]);
+    await vi.waitFor(() => expect(browser.hardNavigate).toHaveBeenCalledWith("/login"));
+    expect(fetchFn).toHaveBeenCalledWith("/api/cricai/_session", { method: "DELETE" });
+  });
+
+  it("still goes to /login when the sign-out call fails", async () => {
+    browser.hardNavigate.mockReset();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("offline");
+      }),
+    );
+    renderShell("parent");
+    fireEvent.click(screen.getAllByRole("button", { name: "Sign out" })[0]);
+    await vi.waitFor(() => expect(browser.hardNavigate).toHaveBeenCalledWith("/login"));
+  });
+
+  it("offers no sign-out when nobody is signed in", () => {
+    renderShell(null);
+    expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
   });
 });

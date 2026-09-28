@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { AppShell } from "@/components/shell/AppShell";
+import { SessionRoleProvider } from "@/components/shell/SessionRoleProvider";
 import { ToastProvider } from "@/components/ui/Toast";
-import { RoleProvider } from "@/lib/auth/role";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -24,11 +24,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     // The theme toggle sets data-theme on <html> after hydration.
     <html lang="en" suppressHydrationWarning>
       <body>
-        <RoleProvider role={null}>
+        <SessionRoleProvider>
           <ToastProvider>
             <AppShell>{children}</AppShell>
           </ToastProvider>
-        </RoleProvider>
+        </SessionRoleProvider>
       </body>
     </html>
   );
