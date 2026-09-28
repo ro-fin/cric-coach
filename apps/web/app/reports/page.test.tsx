@@ -6,7 +6,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiError } from "@/lib/api";
+import { ApiError, apiBase, authHeaders } from "@/lib/api";
 import type { Report } from "./api";
 import { reportCacheKey } from "./cache";
 import ExportButtons from "./ExportButtons";
@@ -242,7 +242,6 @@ describe("ExportButtons", () => {
   });
 
   it("downloads the PDF via an authenticated fetch and a blob object URL (US-K5)", async () => {
-    vi.stubEnv("NEXT_PUBLIC_API_TOKEN", "coach-tok");
     exportFetch.mockResolvedValue({
       ok: true,
       blob: async () => new Blob(["%PDF"], { type: "application/pdf" }),
@@ -254,11 +253,10 @@ describe("ExportButtons", () => {
     render(<ExportButtons reportId="r1" />);
     await user.click(screen.getByRole("button", { name: "Export PDF" }));
     await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith("blob:cricai-export"));
-    // the request carries the bearer header a bare <a href> could never send
-    expect(exportFetch).toHaveBeenCalledWith(
-      "http://localhost:8000/reports/r1/export?format=pdf",
-      { headers: { Authorization: "Bearer coach-tok" } },
-    );
+    // the request carries the shared auth headers a bare <a href> could never send
+    expect(exportFetch).toHaveBeenCalledWith(`${apiBase()}/reports/r1/export?format=pdf`, {
+      headers: authHeaders(),
+    });
     expect(createObjectURL).toHaveBeenCalledTimes(1);
     expect(clickSpy).toHaveBeenCalledTimes(1);
     const anchor = clickSpy.mock.instances[0] as unknown as HTMLAnchorElement;
@@ -280,10 +278,9 @@ describe("ExportButtons", () => {
     render(<ExportButtons reportId="r1" />);
     await user.click(screen.getByRole("button", { name: "Export PNG" }));
     await waitFor(() => expect(revokeObjectURL).toHaveBeenCalled());
-    expect(exportFetch).toHaveBeenCalledWith(
-      "http://localhost:8000/reports/r1/export?format=png",
-      { headers: {} },
-    );
+    expect(exportFetch).toHaveBeenCalledWith(`${apiBase()}/reports/r1/export?format=png`, {
+      headers: authHeaders(),
+    });
     const anchor = clickSpy.mock.instances[0] as unknown as HTMLAnchorElement;
     expect(anchor.download).toBe("report-r1.png");
     clickSpy.mockRestore();

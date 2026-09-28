@@ -1,9 +1,10 @@
 /** US-K3: notes fetch helpers — URL building, shared auth convention, error
- * surfacing. Base and bearer come from lib/api (NEXT_PUBLIC_API_BASE_URL +
- * NEXT_PUBLIC_API_TOKEN); the old localStorage token path is gone — nothing
- * ever wrote it, so it could never authenticate a real device. */
+ * surfacing. Base and auth headers come from lib/api (`apiBase()`,
+ * `authHeaders()`); expectations are built from those same helpers so the
+ * tests hold under either transport (direct API or same-origin proxy). */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { apiBase, authHeaders } from "@/lib/api";
 import { createNote, deleteNote, listNotes } from "./api";
 
 const fetchMock = vi.fn();
@@ -23,26 +24,24 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  vi.unstubAllEnvs();
 });
 
 describe("listNotes", () => {
-  it("queries by player only when no filters are set (shared LAN base, no token)", async () => {
+  it("queries by player only when no filters are set", async () => {
     fetchMock.mockResolvedValue(ok([]));
     await expect(listNotes({ playerId: "p1" })).resolves.toEqual([]);
-    expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/notes?player_id=p1", {
-      headers: {},
+    expect(fetchMock).toHaveBeenCalledWith(`${apiBase()}/notes?player_id=p1`, {
+      headers: authHeaders(),
     });
   });
 
-  it("adds session, ball and search filters and the env bearer token", async () => {
-    vi.stubEnv("NEXT_PUBLIC_API_TOKEN", "tok-1");
+  it("adds session, ball and search filters with the shared auth headers", async () => {
     fetchMock.mockResolvedValue(ok([{ id: "n1" }]));
     const notes = await listNotes({ playerId: "p1", sessionId: "s1", ballNo: 7, q: "pull" });
     expect(notes).toEqual([{ id: "n1" }]);
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:8000/notes?player_id=p1&session_id=s1&ball_no=7&q=pull",
-      { headers: { Authorization: "Bearer tok-1" } },
+      `${apiBase()}/notes?player_id=p1&session_id=s1&ball_no=7&q=pull`,
+      { headers: authHeaders() },
     );
   });
 
@@ -53,14 +52,13 @@ describe("listNotes", () => {
 });
 
 describe("createNote", () => {
-  it("posts the draft as JSON with the env bearer token", async () => {
-    vi.stubEnv("NEXT_PUBLIC_API_TOKEN", "tok-1");
+  it("posts the draft as JSON with the shared auth headers", async () => {
     fetchMock.mockResolvedValue(ok({ id: "n1" }));
     const draft = { player_id: "p1", body: "Watch the elbow.", visibility: "shared" as const };
     await expect(createNote(draft)).resolves.toEqual({ id: "n1" });
-    expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/notes", {
+    expect(fetchMock).toHaveBeenCalledWith(`${apiBase()}/notes`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer tok-1" },
+      headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify(draft),
     });
   });
@@ -77,9 +75,9 @@ describe("deleteNote", () => {
   it("issues DELETE and resolves on success", async () => {
     fetchMock.mockResolvedValue(ok(null));
     await deleteNote("n1");
-    expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/notes/n1", {
+    expect(fetchMock).toHaveBeenCalledWith(`${apiBase()}/notes/n1`, {
       method: "DELETE",
-      headers: {},
+      headers: authHeaders(),
     });
   });
 

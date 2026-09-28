@@ -315,7 +315,7 @@ describe("SessionDetailClient (US-K1, US-B5)", () => {
     await detailLoaded();
     expect(screen.getByTestId("no-selection")).toBeInTheDocument();
     expect(fetchFn).toHaveBeenCalledWith(
-      "http://localhost:8000/sessions/s1",
+      expect.stringMatching(/\/sessions\/s1$/),
       expect.anything(),
     );
   });

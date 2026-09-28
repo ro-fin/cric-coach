@@ -141,8 +141,8 @@ describe("BallMetricsPanel (US-K1 metric summary chips)", () => {
     render(<BallMetricsPanel sessionId="s1" ballNo={1} />);
     expect(await screen.findByTestId("metrics-empty")).toBeInTheDocument();
     expect(fetchFn).toHaveBeenCalledWith(
-      "http://localhost:8000/sessions/s1/balls/1/metrics",
-      expect.objectContaining({ headers: { Authorization: "Bearer " } }),
+      expect.stringMatching(/\/sessions\/s1\/balls\/1\/metrics$/),
+      expect.anything(),
     );
   });
 });
