@@ -214,7 +214,7 @@ describe("ReportView", () => {
     expect(screen.getByText(/ball 3 - C1:/)).toBeInTheDocument();
     expect(screen.getByText("clip-b")).toBeInTheDocument();
     expect(screen.getByTestId("drill")).toHaveTextContent("Front-foot ladder drill. Do 30 balls.");
-    expect(screen.getByTestId("goal")).toHaveTextContent("control_pct: reach 70 next session.");
+    expect(screen.getByTestId("goal")).toHaveTextContent("Control (%): reach 70 next session.");
     expect(screen.getByTestId("fatigue")).toHaveTextContent(
       "Last 30 balls · control drop 12.5 points · watching: control_pct, exit_velo",
     );
@@ -258,6 +258,21 @@ describe("ReportView", () => {
     expect(screen.getByTestId("safety")).toHaveAttribute("role", "alert");
   });
 
+  it("renders a body that lacks optional keys without crashing", () => {
+    const legacy = {
+      kind: "daily",
+      period: { start: "2026-07-09", end: "2026-07-09" },
+      positive: "Great effort today.",
+    } as unknown as ReportBody;
+    render(<ReportView body={legacy} />);
+    expect(screen.getByRole("heading", { name: "daily report" })).toBeInTheDocument();
+    expect(screen.getByTestId("positive")).toHaveTextContent("Great effort today.");
+    for (const id of ["safety", "honesty-banner", "coverage-note", "drill", "goal", "fatigue", "claims"]) {
+      expect(screen.queryByTestId(id), id).not.toBeInTheDocument();
+    }
+    expect(screen.queryByText("Also worth a look")).not.toBeInTheDocument();
+  });
+
   it("renders the honest empty body with only header and positive", () => {
     render(<ReportView body={emptyBody()} />);
     expect(screen.getByTestId("positive")).toBeInTheDocument();
@@ -299,7 +314,7 @@ describe("ReportView", () => {
     );
     expect(screen.queryByTestId("safety")).not.toBeInTheDocument();
     expect(screen.getByTestId("goal")).toHaveTextContent(
-      "control_pct: reach coach-set next session.",
+      "Control (%): reach coach-set next session.",
     );
     expect(screen.getByTestId("fatigue")).not.toHaveTextContent("watching:");
     expect(screen.queryByTestId("trends")).not.toBeInTheDocument();

@@ -12,6 +12,14 @@ function setup(filter: TimelineFilter = EMPTY_FILTER, blocks: number[] = [1, 2])
 }
 
 describe("TimelineFilters (US-K1 AC: block/line/length/shot/outcome/control)", () => {
+  it("names each select by its label alone, not by its option texts", () => {
+    setup();
+    for (const name of ["Block", "Line", "Length", "Shot", "Outcome", "Control"]) {
+      const select = screen.getByRole("combobox", { name });
+      expect(select).toHaveAccessibleName(name);
+    }
+  });
+
   it("renders every filter control with its vocabulary", () => {
     setup();
     expect(screen.getByLabelText("Block")).toBeInTheDocument();

@@ -20,6 +20,7 @@
  */
 
 import { BattingSplit, BowlingSection, CorrectionItem, EvidenceMap, ReportBody } from "./api";
+import { metricLabel } from "./labels";
 
 /** Null percentages/heights are unknowable, shown honestly — never as 0. */
 function pctText(value: number | null): string {
@@ -276,6 +277,9 @@ export default function ReportView({
   body: ReportBody;
   sessionId?: string | null;
 }) {
+  // A body from an older writer may lack a key: treat a missing key like null / empty.
+  const secondary = body.secondary ?? [];
+  const claims = body.claims ?? [];
   return (
     <article className="report-view flex flex-col gap-4 text-ink" data-kind={body.kind}>
       <header data-wall="core">
@@ -284,7 +288,7 @@ export default function ReportView({
           {body.period.start} to {body.period.end}
         </p>
       </header>
-      {body.safety !== null && body.safety.active && (
+      {body.safety != null && body.safety.active && (
         <section
           data-testid="safety"
           data-wall="core"
@@ -295,7 +299,7 @@ export default function ReportView({
           <p className="text-lg font-semibold">{body.safety.text}</p>
         </section>
       )}
-      {body.honesty_banner !== null && (
+      {body.honesty_banner != null && (
         <p
           className="honesty-banner rounded-xl border-2 border-warning p-3 font-semibold"
           data-testid="honesty-banner"
@@ -304,7 +308,7 @@ export default function ReportView({
           {body.honesty_banner}
         </p>
       )}
-      {body.coverage_note !== null && (
+      {body.coverage_note != null && (
         <p
           className="coverage-note rounded-xl border border-warning p-3"
           data-testid="coverage-note"
@@ -313,24 +317,24 @@ export default function ReportView({
           {body.coverage_note}
         </p>
       )}
-      {body.main_correction !== null && (
+      {body.main_correction != null && (
         <Correction title="Main correction" item={body.main_correction} sessionId={sessionId} />
       )}
-      {body.drill !== null && (
+      {body.drill != null && (
         <section data-testid="drill" data-wall="core" className="rounded-xl border border-border bg-surface p-4">
           <h2 className="mb-2 text-xl font-semibold">Tomorrow&apos;s drill</h2>
           <p className="text-lg">{body.drill.text}</p>
         </section>
       )}
-      {body.goal !== null && (
+      {body.goal != null && (
         <section data-testid="goal" data-wall="core" className="rounded-xl border border-border bg-surface p-4">
           <h2 className="mb-2 text-xl font-semibold">Goal</h2>
           <p className="text-lg">
-            {body.goal.metric}: reach {body.goal.target ?? "coach-set"} next session.
+            {metricLabel(body.goal.metric)}: reach {body.goal.target ?? "coach-set"} next session.
           </p>
         </section>
       )}
-      {body.fatigue_note !== null && (
+      {body.fatigue_note != null && (
         <section data-testid="fatigue" data-wall="detail" className="rounded-xl border border-border bg-surface p-4">
           <h2 className="mb-2 text-xl font-semibold">Fatigue check</h2>
           <p>{body.fatigue_note.text}</p>
@@ -342,12 +346,12 @@ export default function ReportView({
           </p>
         </section>
       )}
-      {body.batting_split !== undefined && <BattingSplitTable split={body.batting_split} />}
-      {body.secondary.length > 0 && (
+      {body.batting_split != null && <BattingSplitTable split={body.batting_split} />}
+      {secondary.length > 0 && (
         <details className="secondary rounded-xl border border-border bg-surface p-4" data-wall="detail">
           <summary className="min-h-11 cursor-pointer font-semibold">Also worth a look</summary>
           <ul className="mt-2 flex flex-col gap-3">
-            {body.secondary.map((item) => (
+            {secondary.map((item) => (
               <li key={item.finding_id}>
                 {item.text}
                 <Evidence evidence={item.evidence} sessionId={sessionId} />
@@ -360,7 +364,7 @@ export default function ReportView({
         <h2 className="mb-2 text-xl font-semibold">What went well</h2>
         <p className="text-lg text-success">{body.positive}</p>
       </section>
-      {body.claims.length > 0 && (
+      {claims.length > 0 && (
         <section data-testid="claims" data-wall="detail" className="rounded-xl border border-border bg-surface p-4">
           <h2 className="mb-2 text-xl font-semibold">Numbers in this report</h2>
           <table>
@@ -372,7 +376,7 @@ export default function ReportView({
               </tr>
             </thead>
             <tbody>
-              {body.claims.map((claim) => (
+              {claims.map((claim) => (
                 <tr key={claim.recompute_key}>
                   <td>{claim.metric}</td>
                   <td>{claim.value}</td>
@@ -385,8 +389,8 @@ export default function ReportView({
           </table>
         </section>
       )}
-      {body.bowling !== undefined && <Bowling bowling={body.bowling} />}
-      {body.trends !== undefined && body.trends.length > 0 && (
+      {body.bowling != null && <Bowling bowling={body.bowling} />}
+      {body.trends != null && body.trends.length > 0 && (
         <section data-testid="trends" data-wall="detail" className="rounded-xl border border-border bg-surface p-4">
           <h2 className="mb-2 text-xl font-semibold">Trends</h2>
           <ul>
@@ -402,7 +406,7 @@ export default function ReportView({
           </ul>
         </section>
       )}
-      {body.milestones !== undefined && body.milestones.length > 0 && (
+      {body.milestones != null && body.milestones.length > 0 && (
         <section data-testid="milestones" data-wall="detail" className="rounded-xl border border-border bg-surface p-4">
           <h2 className="mb-2 text-xl font-semibold">Milestones</h2>
           <ul>

@@ -53,7 +53,7 @@ export function evidenceLinks(evidence: EvidenceMap, sessionId: string | null): 
 export function reportCaveats(report: ReportOut): string[] {
   const { honesty_banner, coverage_note } = report.body;
   return [honesty_banner, coverage_note].filter(
-    (text): text is string => text !== null && text !== "",
+    (text): text is string => typeof text === "string" && text !== "",
   );
 }
 

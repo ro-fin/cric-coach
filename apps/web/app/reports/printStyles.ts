@@ -33,8 +33,12 @@ export const PRINT_STYLES = `
   html[data-print-mode="wall"] .report-view [data-wall="detail"],
   html[data-print-mode="wall"] .report-view .evidence,
   html[data-print-mode="wall"] [data-print-wall="hide"] { display: none !important; }
-  html[data-print-mode="wall"] .report-view { font-size: 20pt; line-height: 1.3; }
+  /* Tailwind sizes are rem-based: raise the root size so they scale with the sheet */
+  html[data-print-mode="wall"] { font-size: 20pt; }
+  /* ...but spacing must not grow with it, or the one-page sheet spills onto a second */
+  html[data-print-mode="wall"] .report-view { font-size: 1rem; line-height: 1.3; gap: 5mm; }
+  html[data-print-mode="wall"] .report-view [data-wall="core"] { padding: 3mm 5mm; }
   html[data-print-mode="wall"] .report-view h1 { font-size: 30pt; }
-  html[data-print-mode="wall"] .report-view h2 { font-size: 24pt; margin-top: 10mm; }
+  html[data-print-mode="wall"] .report-view h2 { font-size: 24pt; margin: 0 0 1.5mm; }
 }
 `;

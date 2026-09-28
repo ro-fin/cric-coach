@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/api";
 import type { ApiClient, SessionOut, SessionPage } from "@/lib/api";
 import { RoleProvider, type Role } from "@/lib/auth/role";
-import { expectAxeClean } from "@/lib/testing/axe";
+import { expectNoA11yViolations } from "@/test/axe";
 import SessionListClient, { PAGE_SIZE } from "./SessionListClient";
 
 function session(overrides: Partial<SessionOut> = {}): SessionOut {
@@ -188,7 +188,7 @@ describe("SessionListClient (US-B5 AC: filterable by date/type)", () => {
   it("is axe clean", async () => {
     const { container } = withRole(<SessionListClient client={fakeClient()} />, "coach");
     await screen.findByRole("list", { name: "Sessions" });
-    await expectAxeClean(container);
+    await expectNoA11yViolations(container);
   });
 
   it("ignores results and errors that land after unmount", async () => {

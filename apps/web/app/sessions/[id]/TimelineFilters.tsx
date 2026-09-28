@@ -6,6 +6,7 @@
  * block numbers actually present in this session's tags.
  */
 
+import { useId } from "react";
 import { Button } from "@/components/ui";
 import {
   EMPTY_FILTER,
@@ -41,6 +42,11 @@ const SELECTS: readonly SelectSpec[] = [
 ];
 
 export default function TimelineFilters({ filter, blocks, onChange }: TimelineFiltersProps) {
+  // Each <select> is named by a sibling <label htmlFor>, never by a wrapping label:
+  // a wrapping label would pull every option text into the accessible name.
+  const baseId = useId();
+  const idFor = (key: string) => `${baseId}-${key}`;
+
   function set(partial: Partial<TimelineFilter>) {
     onChange({ ...filter, ...partial });
   }
@@ -48,9 +54,10 @@ export default function TimelineFilters({ filter, blocks, onChange }: TimelineFi
   return (
     <fieldset data-testid="timeline-filters" className="grid grid-cols-2 gap-3 sm:grid-cols-3">
       <legend className="mb-2 text-lg font-semibold">Filters</legend>
-      <label className={LABEL}>
-        Block
+      <div className={LABEL}>
+        <label htmlFor={idFor("block")}>Block</label>
         <select
+          id={idFor("block")}
           className={FIELD}
           value={filter.block === null ? "" : String(filter.block)}
           onChange={(event) =>
@@ -64,11 +71,12 @@ export default function TimelineFilters({ filter, blocks, onChange }: TimelineFi
             </option>
           ))}
         </select>
-      </label>
+      </div>
       {SELECTS.map(({ key, label, options }) => (
-        <label key={key} className={LABEL}>
-          {label}
+        <div key={key} className={LABEL}>
+          <label htmlFor={idFor(key)}>{label}</label>
           <select
+            id={idFor(key)}
             className={FIELD}
             value={filter[key] ?? ""}
             onChange={(event) =>
@@ -84,11 +92,12 @@ export default function TimelineFilters({ filter, blocks, onChange }: TimelineFi
               </option>
             ))}
           </select>
-        </label>
+        </div>
       ))}
-      <label className={LABEL}>
-        Control
+      <div className={LABEL}>
+        <label htmlFor={idFor("control")}>Control</label>
         <select
+          id={idFor("control")}
           className={FIELD}
           value={filter.control === null ? "" : String(filter.control)}
           onChange={(event) =>
@@ -99,7 +108,7 @@ export default function TimelineFilters({ filter, blocks, onChange }: TimelineFi
           <option value="true">controlled</option>
           <option value="false">uncontrolled</option>
         </select>
-      </label>
+      </div>
       <Button
         variant="ghost"
         className="self-end"

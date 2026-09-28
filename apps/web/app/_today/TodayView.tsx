@@ -28,6 +28,7 @@ import {
   StatTile,
 } from "@/components/ui";
 import type { Role } from "@/lib/auth/role";
+import { metricLabel } from "@/app/reports/labels";
 import { createTodayApi } from "./api";
 import type { PlayerOut, ReportOut, TodayApi, WindowSummaryOut } from "./api";
 import { useLoad } from "./useLoad";
@@ -96,7 +97,7 @@ function ReportContent({ report }: { report: ReportOut }) {
   return (
     <div className="flex flex-col gap-5">
       <p className="text-ink-muted">Report for {report.period_start}</p>
-      {safety !== null && safety.active && (
+      {safety != null && safety.active && (
         <p
           role="alert"
           className="flex items-center gap-2 rounded-xl border-2 border-danger px-4 py-3 font-semibold text-danger"
@@ -110,7 +111,7 @@ function ReportContent({ report }: { report: ReportOut }) {
         <h3 id="today-correction" className="text-lg font-semibold">
           One correction
         </h3>
-        {body.main_correction === null ? (
+        {body.main_correction == null ? (
           <p className="text-ink-muted">No correction today.</p>
         ) : (
           <>
@@ -138,25 +139,25 @@ function ReportContent({ report }: { report: ReportOut }) {
         <h3 id="today-drill" className="text-lg font-semibold">
           One drill
         </h3>
-        <p className={body.drill === null ? "text-ink-muted" : "text-lg"}>
-          {body.drill === null ? "No drill today." : body.drill.text}
+        <p className={body.drill == null ? "text-ink-muted" : "text-lg"}>
+          {body.drill == null ? "No drill today." : body.drill.text}
         </p>
       </article>
       <article aria-labelledby="today-goal">
         <h3 id="today-goal" className="text-lg font-semibold">
           One goal
         </h3>
-        {body.goal === null ? (
+        {body.goal == null ? (
           <p className="text-ink-muted">No goal today.</p>
         ) : (
           <StatTile
-            label={body.goal.metric}
+            label={metricLabel(body.goal.metric)}
             value={body.goal.target === null ? null : String(body.goal.target)}
             reason={body.goal.target === null ? "No target set" : null}
           />
         )}
       </article>
-      {body.positive !== "" && <p className="font-semibold text-success">{body.positive}</p>}
+      {body.positive ? <p className="font-semibold text-success">{body.positive}</p> : null}
       <Link href={`/reports?report_id=${report.id}`} className={TEXT_LINK}>
         Open the full report
       </Link>

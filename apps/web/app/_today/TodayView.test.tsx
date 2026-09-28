@@ -10,7 +10,7 @@ import {
   workloadWindow,
 } from "@/test/fixtures.core";
 import type { PlayerOut, ReportOut, TodayApi, WindowSummaryOut } from "./api";
-import { expectAxeClean } from "@/lib/testing/axe";
+import { expectNoA11yViolations } from "@/test/axe";
 import TodayView from "./TodayView";
 
 vi.mock("./api", async (importOriginal) => {
@@ -54,7 +54,7 @@ describe("TodayView", () => {
       "Tennis-ball head-still drill, 3 sets of 12.",
     );
     const goalCard = screen.getByRole("article", { name: "One goal" });
-    expect(goalCard).toHaveTextContent("head_movement_cm");
+    expect(goalCard).toHaveTextContent("Head movement (cm)");
     expect(goalCard).toHaveTextContent("4");
     expect(screen.getByText("Great balance on the front foot today.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open the full report" })).toHaveAttribute(
@@ -106,6 +106,21 @@ describe("TodayView", () => {
     const clips = screen.getByRole("list", { name: "Evidence clips" });
     expect(clips).toHaveTextContent("Ball 3 · cam");
     expect(within(clips).queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  it("survives a report body that lacks optional keys", async () => {
+    const legacy = {
+      kind: "daily",
+      period: { start: "2026-09-27", end: "2026-09-27" },
+      positive: "Good hands.",
+    } as unknown as ReturnType<typeof reportBody>;
+    const api = fakeApi({ reports: async () => [dailyReport({ body: legacy })] });
+    render(<TodayView role="player" search="" api={api} />);
+    expect(await screen.findByText("No correction today.")).toBeInTheDocument();
+    expect(screen.getByText("No drill today.")).toBeInTheDocument();
+    expect(screen.getByText("No goal today.")).toBeInTheDocument();
+    expect(screen.getByText("Good hands.")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Incomplete data" })).not.toBeInTheDocument();
   });
 
   it("shows the empty report state when nothing is published", async () => {
@@ -225,7 +240,7 @@ describe("TodayView", () => {
     const { container } = render(<TodayView role="parent" search="" api={fakeApi()} />);
     await screen.findByRole("article", { name: "One correction" });
     await screen.findByText("Within the safe workload");
-    await expectAxeClean(container);
+    await expectNoA11yViolations(container);
   });
 
   it("builds the default API client when none is injected", async () => {
