@@ -1,4 +1,4 @@
-/** US-K3: notes page — search-param wiring for player/session/role. */
+/** US-K3: notes page — search-param wiring for player and session. */
 
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,10 +8,18 @@ const nav = vi.hoisted(() => ({ params: new URLSearchParams() }));
 
 vi.mock("next/navigation", () => ({ useSearchParams: () => nav.params }));
 
-vi.mock("./api", () => ({
-  listNotes: vi.fn().mockResolvedValue([]),
-  createNote: vi.fn(),
-  deleteNote: vi.fn(),
+vi.mock("./NotesPageBody", () => ({
+  default: ({
+    playerIdParam,
+    sessionId,
+  }: {
+    playerIdParam: string | null;
+    sessionId: string | null;
+  }) => (
+    <p>
+      notes:{String(playerIdParam)}:{String(sessionId)}
+    </p>
+  ),
 }));
 
 beforeEach(() => {
@@ -19,24 +27,14 @@ beforeEach(() => {
 });
 
 describe("NotesPage", () => {
-  it("asks for a player when player_id is missing", () => {
+  it("passes no player or session when the link carries none", () => {
     render(<NotesPage />);
-    expect(screen.getByText(/missing player_id/)).toBeInTheDocument();
-    expect(screen.queryByTestId("notes-panel")).not.toBeInTheDocument();
+    expect(screen.getByText("notes:null:null")).toBeInTheDocument();
   });
 
-  it("mounts the panel for a player with the coach default role", async () => {
-    nav.params = new URLSearchParams("player_id=p1");
+  it("passes the linked player and session through", () => {
+    nav.params = new URLSearchParams("player_id=p1&session_id=s1");
     render(<NotesPage />);
-    expect(await screen.findByTestId("notes-panel")).toBeInTheDocument();
-    expect(screen.getByRole("form", { name: "Add note" })).toBeInTheDocument();
-    expect(screen.queryByLabelText("Ball number")).not.toBeInTheDocument();
-  });
-
-  it("passes session and player role through (kid mode: read-only)", async () => {
-    nav.params = new URLSearchParams("player_id=p1&session_id=s1&role=player");
-    render(<NotesPage />);
-    expect(await screen.findByTestId("notes-panel")).toBeInTheDocument();
-    expect(screen.queryByRole("form", { name: "Add note" })).not.toBeInTheDocument();
+    expect(screen.getByText("notes:p1:s1")).toBeInTheDocument();
   });
 });

@@ -1,8 +1,10 @@
 /** US-K3: notes panel — CRUD flows, search, kid mode, and the SAF red-team
  * check that script injection in a note body renders inert (React escapes). */
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiError } from "@/lib/api";
+import { expectNoA11yViolations } from "@/test/axe";
 import type { Note } from "./api";
 import NotesPanel from "./NotesPanel";
 
@@ -53,12 +55,45 @@ describe("NotesPanel", () => {
     expect(screen.queryByTestId("notes-empty")).not.toBeInTheDocument();
   });
 
-  it("shows the empty state and load errors", async () => {
+  it("shows the empty state and load errors, and retries", async () => {
     render(<NotesPanel playerId="p1" role="coach" />);
     expect(await screen.findByTestId("notes-empty")).toBeInTheDocument();
-    listMock.mockRejectedValue(new Error("down"));
+    listMock.mockRejectedValueOnce(new Error("down"));
     fireEvent.submit(screen.getByRole("form", { name: "Search notes" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Could not load notes.");
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByTestId("notes-empty")).toBeInTheDocument();
+  });
+
+  it("never claims 'No notes yet' before the server answered", async () => {
+    let release!: (notes: Note[]) => void;
+    listMock.mockReturnValue(new Promise((resolve) => (release = resolve)));
+    render(<NotesPanel playerId="p1" role="coach" />);
+    expect(screen.getByText("Loading notes")).toBeInTheDocument();
+    expect(screen.queryByTestId("notes-empty")).not.toBeInTheDocument();
+    await act(async () => release([]));
+    expect(screen.getByTestId("notes-empty")).toBeInTheDocument();
+  });
+
+  it("shows the role gate on 403", async () => {
+    listMock.mockRejectedValue(new ApiError(403, "requires one of: ['coach', 'parent']"));
+    render(<NotesPanel playerId="p1" role="player" />);
+    expect(await screen.findByTestId("forbidden")).toHaveTextContent(
+      "This screen is for the coach or parent.",
+    );
+  });
+
+  it("gives write controls to nobody when signed out", async () => {
+    render(<NotesPanel playerId="p1" role={null} />);
+    await screen.findByTestId("notes-empty");
+    expect(screen.queryByRole("form", { name: "Add note" })).not.toBeInTheDocument();
+  });
+
+  it("is axe clean with notes and the write form", async () => {
+    listMock.mockResolvedValue([note(), note({ id: "n2", visibility: "shared", ball_no: 3 })]);
+    const { container } = render(<NotesPanel playerId="p1" sessionId="s1" role="coach" />);
+    await screen.findAllByTestId("note-item");
+    await expectNoA11yViolations(container);
   });
 
   it("searches with the typed query", async () => {

@@ -1,36 +1,19 @@
 "use client";
 
-import { Suspense } from "react";
-
 /**
- * US-K3 notes page: /notes?player_id=...&session_id=...&role=... — the panel
- * pinned to a player (and optionally one session). The role parameter only
- * shapes the UI; visibility is enforced server-side per bearer token.
+ * US-K3 notes page: /notes?player_id=...&session_id=... — the panel pinned to
+ * a player (and optionally one session). Without a player id it opens on the
+ * first listed player, with a picker to switch.
  */
 
 import { useSearchParams } from "next/navigation";
-import NotesPanel from "./NotesPanel";
+import { Suspense } from "react";
+import NotesPageBody from "./NotesPageBody";
 
 function NotesPageInner() {
   const params = useSearchParams();
-  const playerId = params.get("player_id");
-  if (playerId === null) {
-    return (
-      <main>
-        <h1>Coach notes</h1>
-        <p>Pick a player to see their notes (missing player_id).</p>
-      </main>
-    );
-  }
   return (
-    <main>
-      <h1>Coach notes</h1>
-      <NotesPanel
-        playerId={playerId}
-        sessionId={params.get("session_id") ?? undefined}
-        role={params.get("role") ?? "coach"}
-      />
-    </main>
+    <NotesPageBody playerIdParam={params.get("player_id")} sessionId={params.get("session_id")} />
   );
 }
 

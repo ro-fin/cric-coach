@@ -47,7 +47,7 @@ describe("listNotes", () => {
 
   it("throws on a non-ok response", async () => {
     fetchMock.mockResolvedValue(fail(403));
-    await expect(listNotes({ playerId: "p1" })).rejects.toThrow("notes list failed: 403");
+    await expect(listNotes({ playerId: "p1" })).rejects.toThrow("API 403: notes list failed");
   });
 });
 
@@ -67,7 +67,7 @@ describe("createNote", () => {
     fetchMock.mockResolvedValue(fail(422));
     await expect(
       createNote({ player_id: "p1", body: "x", visibility: "coach_only" }),
-    ).rejects.toThrow("note create failed: 422");
+    ).rejects.toThrow("API 422: note create failed");
   });
 });
 
@@ -83,6 +83,6 @@ describe("deleteNote", () => {
 
   it("throws on a non-ok response", async () => {
     fetchMock.mockResolvedValue(fail(404));
-    await expect(deleteNote("n1")).rejects.toThrow("note delete failed: 404");
+    await expect(deleteNote("n1")).rejects.toThrow("API 404: note delete failed");
   });
 });

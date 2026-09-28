@@ -1,14 +1,13 @@
 /**
- * US-K3 notes API client. Base URL and bearer token come from the single
- * lib/api convention (NEXT_PUBLIC_API_BASE_URL + NEXT_PUBLIC_API_TOKEN; see
- * apps/web/README.md). The old localStorage token path is gone: no code ever
- * wrote it, so it could never authenticate a real device.
+ * US-K3 notes API client on the shared lib/api convention (`apiBase()` +
+ * `authHeaders()`: the same-origin proxy carries the session). Failures throw
+ * ApiError with the HTTP status, so a 403 reads as "not for your role".
  *
  * Notes render machine-side: the ``body`` field is UNTRUSTED free text and is
  * only ever placed in the DOM through React's text escaping, never as HTML.
  */
 
-import { apiBase, authHeaders } from "@/lib/api";
+import { ApiError, apiBase, authHeaders } from "@/lib/api";
 
 export type NoteVisibility = "coach_only" | "shared";
 
@@ -46,7 +45,7 @@ export async function listNotes(query: NoteQuery): Promise<Note[]> {
   const response = await fetch(`${apiBase()}/notes?${params.toString()}`, {
     headers: authHeaders(),
   });
-  if (!response.ok) throw new Error(`notes list failed: ${response.status}`);
+  if (!response.ok) throw new ApiError(response.status, "notes list failed");
   return (await response.json()) as Note[];
 }
 
@@ -56,7 +55,7 @@ export async function createNote(draft: NoteDraft): Promise<Note> {
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(draft),
   });
-  if (!response.ok) throw new Error(`note create failed: ${response.status}`);
+  if (!response.ok) throw new ApiError(response.status, "note create failed");
   return (await response.json()) as Note;
 }
 
@@ -65,5 +64,5 @@ export async function deleteNote(id: string): Promise<void> {
     method: "DELETE",
     headers: authHeaders(),
   });
-  if (!response.ok) throw new Error(`note delete failed: ${response.status}`);
+  if (!response.ok) throw new ApiError(response.status, "note delete failed");
 }
