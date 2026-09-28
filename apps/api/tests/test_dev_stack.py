@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import OperationalError
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _spec = importlib.util.spec_from_file_location("dev_stack", _REPO_ROOT / "scripts" / "dev_stack.py")
@@ -206,3 +207,36 @@ def test_parallel_requests_from_many_threads_all_succeed(
     with ThreadPoolExecutor(max_workers=8) as pool:
         statuses = list(pool.map(hit, paths))
     assert statuses == [200] * len(paths)
+
+
+def test_rebuild_schema_waits_out_a_locked_table(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    engine = dev_stack.make_engine(tmp_path / "db")
+    real_drop = dev_stack.Base.metadata.drop_all
+    calls = {"n": 0}
+
+    def flaky_drop(bind: object) -> None:
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise OperationalError(
+                "DROP TABLE ball_tags", {}, Exception("database table is locked")
+            )
+        real_drop(bind)
+
+    monkeypatch.setattr(dev_stack.Base.metadata, "drop_all", flaky_drop)
+    monkeypatch.setattr(dev_stack, "RESET_RETRY_S", 0.0)
+    dev_stack.rebuild_schema(engine)
+    assert calls["n"] == 3
+
+    calls["n"] = -10_000  # never recovers
+    with pytest.raises(OperationalError, match="locked"):
+        dev_stack.rebuild_schema(engine, attempts=2)
+
+    def other_error(bind: object) -> None:
+        raise OperationalError("DROP TABLE x", {}, Exception("disk I/O error"))
+
+    monkeypatch.setattr(dev_stack.Base.metadata, "drop_all", other_error)
+    with pytest.raises(OperationalError, match="disk I/O"):
+        dev_stack.rebuild_schema(engine)
+    engine.dispose()

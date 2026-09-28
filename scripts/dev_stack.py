@@ -42,6 +42,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import uuid
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -72,6 +73,7 @@ from cricai_data.models import Session as SessionRow
 from fastapi import APIRouter, FastAPI, Header, HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, create_engine, event
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session as OrmSession
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -378,6 +380,30 @@ def seed_demo(app: FastAPI) -> SeedSummary:
 
 RESET_PATH = "/__dev/reset"
 
+#: Serializes resets; a second reset while one runs would race the seed.
+reset_lock = threading.Lock()
+RESET_ATTEMPTS = 40
+RESET_RETRY_S = 0.25
+
+
+def rebuild_schema(engine: Engine, attempts: int = RESET_ATTEMPTS) -> None:
+    """Drop and recreate every table, waiting out readers still in flight.
+
+    A journey's page can still be fetching when the next journey resets, and
+    SQLite refuses to drop a table a reader holds ("database table is locked",
+    seen by T3 once in about four runs). Retry until the readers finish rather
+    than answer 500.
+    """
+    for attempt in range(1, attempts + 1):
+        try:
+            Base.metadata.drop_all(engine)
+            create_all(engine)
+            return
+        except OperationalError as exc:
+            if "locked" not in str(exc).lower() or attempt == attempts:
+                raise
+            time.sleep(RESET_RETRY_S)
+
 
 def mount_dev_reset(app: FastAPI) -> None:
     """Add POST /__dev/reset: wipe the in-memory database and reseed the demo.
@@ -394,9 +420,9 @@ def mount_dev_reset(app: FastAPI) -> None:
         if authorization != f"Bearer {PARENT_TOKEN}":
             raise HTTPException(status_code=401, detail="dev reset needs the dev parent token")
         engine: Engine = app.state.engine
-        Base.metadata.drop_all(engine)
-        create_all(engine)
-        return asdict(seed_demo(app))
+        with reset_lock:
+            rebuild_schema(engine)
+            return asdict(seed_demo(app))
 
     app.include_router(router)
 
