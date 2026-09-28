@@ -233,3 +233,15 @@ describe("SettingsPage and defaults", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("history table layout", () => {
+  it("is a named, keyboard-focusable scroll region with a readable reason column", async () => {
+    show(seeded().fetch);
+    await screen.findByTestId("settings-history");
+    expect(screen.getByRole("region", { name: "Settings version history table" })).toHaveAttribute(
+      "tabindex",
+      "0",
+    );
+    expect(screen.getByRole("columnheader", { name: "Reason" })).toHaveClass("min-w-48");
+  });
+});

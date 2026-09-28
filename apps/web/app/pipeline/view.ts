@@ -41,15 +41,27 @@ export function newestRunId(runs: readonly { id: string }[]): string | null {
 
 /** A served ISO timestamp in the viewer's locale; null means not finished.
  * Formatting only: the raw value stays in the <time dateTime> attribute. */
-export function formatWhen(iso: string | null, pending = "not finished"): string {
+export function formatWhen(
+  iso: string | null,
+  pending = "not finished",
+  style: "datetime" | "time" = "datetime",
+): string {
   if (iso === null) {
     return pending;
   }
-  const at = new Date(iso);
+  const at = new Date(asUtc(iso));
   if (Number.isNaN(at.getTime())) {
     return iso;
   }
-  return at.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  return style === "time"
+    ? at.toLocaleTimeString(undefined, { timeStyle: "medium" })
+    : at.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
+/** The API stores UTC; some dialects (SQLite) serialise it without an offset.
+ * A date-time with no zone designator is therefore read as UTC, not local. */
+export function asUtc(iso: string): string {
+  return /T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(iso) ? `${iso}Z` : iso;
 }
 
 /** Short digest for a table cell; the full value stays in the title. */
@@ -57,5 +69,5 @@ export function shortDigest(digest: string | null): string {
   if (digest === null) {
     return "none";
   }
-  return digest.length > 19 ? `${digest.slice(0, 19)}…` : digest;
+  return digest.length > 14 ? `${digest.slice(0, 14)}…` : digest;
 }

@@ -21,6 +21,10 @@ describe("alerts view model", () => {
       ["frames", "12"],
       ["extra", '{"a":1}'],
     ]);
+    expect(detailRows({ cameras: ["C2", "C3"], mixed: [1, { a: 1 }] })).toEqual([
+      ["cameras", "C2, C3"],
+      ["mixed", '[1,{"a":1}]'],
+    ]);
   });
 
   it("replaces the acknowledged row in place", () => {

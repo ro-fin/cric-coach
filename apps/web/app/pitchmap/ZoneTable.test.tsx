@@ -97,3 +97,10 @@ describe("ZoneTable", () => {
     expect(screen.queryByTestId("zone-table")).not.toBeInTheDocument();
   });
 });
+
+describe("ZoneTable scroll region", () => {
+  it("is a named, keyboard-focusable region", () => {
+    render(<ZoneTable cells={CELLS} selectedCell={null} onSelectCell={vi.fn()} />);
+    expect(screen.getByRole("region", { name: "Zone analytics table" })).toHaveAttribute("tabindex", "0");
+  });
+});

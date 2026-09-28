@@ -21,12 +21,20 @@ export function severityTone(severity: string): Tone {
   return SEVERITY_TONES[severity] ?? "neutral";
 }
 
-/** The detail object as rows, values rendered verbatim (objects as JSON). */
+/** The detail object as rows, values rendered verbatim: lists of plain values
+ * joined with commas, other objects as JSON. */
 export function detailRows(detail: Record<string, unknown>): [string, string][] {
   return Object.entries(detail).map(([key, value]) => [
     key,
-    typeof value === "string" ? value : JSON.stringify(value),
+    typeof value === "string" ? value : listText(value) ?? JSON.stringify(value),
   ]);
+}
+
+function listText(value: unknown): string | null {
+  if (!Array.isArray(value) || value.some((item) => typeof item === "object" && item !== null)) {
+    return null;
+  }
+  return value.map(String).join(", ");
 }
 
 /** Replace one row with the server's answer, keeping the served order. */

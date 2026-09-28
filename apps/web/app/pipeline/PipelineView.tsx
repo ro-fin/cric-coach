@@ -9,7 +9,7 @@
  * sees the forbidden state and no request is made.
  */
 
-import { Play, RotateCcw } from "lucide-react";
+import { Eraser, Play, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Badge,
@@ -38,6 +38,7 @@ import { cn } from "@/lib/cn";
 import { degradedReasons } from "../pitchmap/view";
 import { accessFor, failure, type Load, LOADING, ready } from "./access";
 import { createPipelineApi, type RunDetailOut, type RunSummaryOut } from "./api";
+import { RederiveDialog } from "./RederiveDialog";
 import {
   canTrigger,
   formatWhen,
@@ -51,11 +52,23 @@ import {
 const TH = "px-3 py-2 text-left text-sm font-semibold text-ink-muted";
 const TD = "px-3 py-2 align-top";
 
-function When({ iso, pending }: { iso: string | null; pending?: string }) {
+function When({
+  iso,
+  pending,
+  style,
+}: {
+  iso: string | null;
+  pending?: string;
+  style?: "datetime" | "time";
+}) {
   if (iso === null) {
     return <span className="text-ink-muted">{formatWhen(null, pending)}</span>;
   }
-  return <time dateTime={iso}>{formatWhen(iso)}</time>;
+  return (
+    <time dateTime={iso} className="whitespace-nowrap">
+      {formatWhen(iso, undefined, style)}
+    </time>
+  );
 }
 
 function sessionLabel(session: SessionOut): string {
@@ -72,7 +85,7 @@ function RunsTable({
   onSelect: (id: string) => void;
 }) {
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Pipeline runs table">
       <table data-testid="runs-table" className="w-full border-collapse">
         <caption className="sr-only">Pipeline runs for this session, oldest first</caption>
         <thead>
@@ -146,7 +159,7 @@ function TraceTable({ run }: { run: RunDetailOut }) {
           This run has not recorded any stage attempts yet.
         </p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Stage trace table">
           <table data-testid="trace-table" className="w-full border-collapse">
             <caption className="sr-only">Stage attempts in pipeline order</caption>
             <thead>
@@ -159,18 +172,15 @@ function TraceTable({ run }: { run: RunDetailOut }) {
                 <th scope="col" className={TH}>Finished</th>
               </tr>
             </thead>
-            <tbody>
-              {run.stages.map((stage) => (
-                <tr
-                  key={`${stage.stage}-${stage.attempt}`}
-                  data-testid={`stage-${stage.stage}-${stage.attempt}`}
-                  className="border-b border-border last:border-b-0"
-                >
+            {run.stages.map((stage) => (
+              <tbody
+                key={`${stage.stage}-${stage.attempt}`}
+                data-testid={`stage-${stage.stage}-${stage.attempt}`}
+                className="border-b border-border last:border-b-0"
+              >
+                <tr>
                   <th scope="row" className={cn(TD, "text-left font-semibold text-ink")}>
                     {stage.stage}
-                    {stage.error !== null && (
-                      <p className="mt-1 font-normal text-danger">{stage.error}</p>
-                    )}
                   </th>
                   <td className={TD}>{stage.attempt}</td>
                   <td className={TD}>
@@ -180,14 +190,27 @@ function TraceTable({ run }: { run: RunDetailOut }) {
                     <span title={stage.input_digest ?? undefined}>{shortDigest(stage.input_digest)}</span>
                   </td>
                   <td className={TD}>
-                    <When iso={stage.started_at} pending="not started" />
+                    <When iso={stage.started_at} pending="not started" style="time" />
                   </td>
                   <td className={TD}>
-                    <When iso={stage.finished_at} />
+                    <When iso={stage.finished_at} style="time" />
                   </td>
                 </tr>
-              ))}
-            </tbody>
+                {stage.error !== null && (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className={cn(
+                        "px-3 pb-3 text-base break-words",
+                        stage.status === "skipped" ? "text-ink-muted" : "text-danger",
+                      )}
+                    >
+                      {stage.error}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            ))}
           </table>
         </div>
       )}
@@ -214,6 +237,7 @@ export default function PipelineView({ config }: PipelineViewProps) {
   const [runId, setRunId] = useState<string | null>(null);
   const [trace, setTrace] = useState<Load<RunDetailOut>>(LOADING);
   const [busy, setBusy] = useState<"run" | "resume" | null>(null);
+  const [rederiving, setRederiving] = useState(false);
   const [sessionsAttempt, setSessionsAttempt] = useState(0);
   const [runsAttempt, setRunsAttempt] = useState(0);
   const [traceAttempt, setTraceAttempt] = useState(0);
@@ -331,6 +355,10 @@ export default function PipelineView({ config }: PipelineViewProps) {
           <Play aria-hidden="true" className="size-5" />
           Run pipeline
         </Button>
+        <Button variant="secondary" disabled={busy !== null} onClick={() => setRederiving(true)}>
+          <Eraser aria-hidden="true" className="size-5" />
+          Re-derive
+        </Button>
         <Button
           variant="secondary"
           loading={busy === "resume"}
@@ -441,6 +469,21 @@ export default function PipelineView({ config }: PipelineViewProps) {
             </CardBody>
           </Card>
 
+          {rederiving && (
+            <RederiveDialog
+              api={pipeline}
+              sessionId={selected.id}
+              sessionLabel={sessionLabel(selected)}
+              onClose={() => setRederiving(false)}
+              onDone={(out) => {
+                setRederiving(false);
+                setRunsAttempt((value) => value + 1);
+                if (out.run !== null) {
+                  setRunId(out.run.run_id);
+                }
+              }}
+            />
+          )}
           {runId !== null && (
             <Card aria-labelledby="pipeline-trace-title">
               <CardHeader>

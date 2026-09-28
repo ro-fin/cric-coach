@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  asUtc,
   canTrigger,
   formatWhen,
   newestRunId,
@@ -43,7 +44,7 @@ describe("pipeline view model", () => {
   it("shortens long digests only", () => {
     expect(shortDigest(null)).toBe("none");
     expect(shortDigest("sha256:abc")).toBe("sha256:abc");
-    expect(shortDigest("sha256:0123456789abcdef0123")).toBe("sha256:0123456789ab…");
+    expect(shortDigest("sha256:0123456789abcdef0123")).toBe("sha256:0123456…");
   });
 });
 
@@ -56,5 +57,22 @@ describe("formatWhen", () => {
   it("formats a served timestamp and keeps an unreadable one verbatim", () => {
     expect(formatWhen("2026-09-27T10:00:00Z")).toMatch(/2026/);
     expect(formatWhen("yesterday")).toBe("yesterday");
+  });
+});
+
+describe("timestamps without a zone", () => {
+  it("reads a naive date-time as UTC and leaves zoned or date-only values alone", () => {
+    expect(asUtc("2026-09-28T15:32:20.538339")).toBe("2026-09-28T15:32:20.538339Z");
+    expect(asUtc("2026-09-28T15:32")).toBe("2026-09-28T15:32Z");
+    expect(asUtc("2026-09-28T15:32:20Z")).toBe("2026-09-28T15:32:20Z");
+    expect(asUtc("2026-09-28T15:32:20+05:30")).toBe("2026-09-28T15:32:20+05:30");
+    expect(asUtc("2026-09-28")).toBe("2026-09-28");
+  });
+
+  it("formats naive and zoned forms of the same instant identically", () => {
+    expect(formatWhen("2026-09-28T15:32:20")).toBe(formatWhen("2026-09-28T15:32:20Z"));
+    expect(formatWhen("2026-09-28T15:32:20", undefined, "time")).toBe(
+      new Date("2026-09-28T15:32:20Z").toLocaleTimeString(undefined, { timeStyle: "medium" }),
+    );
   });
 });

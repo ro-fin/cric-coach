@@ -7,7 +7,7 @@
  * proxy configuration (`defaultConfig()`) applies here untouched.
  */
 
-import { apiRequest, defaultConfig, type ApiConfig } from "@/lib/api";
+import { ApiError, apiRequest, defaultConfig, detailText, type ApiConfig } from "@/lib/api";
 
 // ---------------------------------------------------------------------------
 // Enum vocabularies (cricai_data.enums / cricai_worker.pipeline wire values).
@@ -109,6 +109,28 @@ export interface RederiveIn {
   start_run?: boolean;
 }
 
+/** A re-derive either ran, or was refused because manual rows would be lost:
+ * the router answers 409 with `{message, blockers}` and modifies nothing. */
+export type RederiveResult =
+  | { kind: "done"; out: RederiveOut }
+  | { kind: "blocked"; message: string; blockers: Record<string, number> };
+
+/** The structured 409 body of a blocked re-derive, or null for any other body. */
+export function blockedDetail(body: unknown): { message: string; blockers: Record<string, number> } | null {
+  if (typeof body !== "object" || body === null) {
+    return null;
+  }
+  const detail = (body as { detail?: unknown }).detail;
+  if (typeof detail !== "object" || detail === null) {
+    return null;
+  }
+  const { message, blockers } = detail as { message?: unknown; blockers?: unknown };
+  if (typeof message !== "string" || typeof blockers !== "object" || blockers === null) {
+    return null;
+  }
+  return { message, blockers: blockers as Record<string, number> };
+}
+
 // ---------------------------------------------------------------------------
 // Client.
 // ---------------------------------------------------------------------------
@@ -118,7 +140,7 @@ export interface PipelineApi {
   runDetail(runId: string): Promise<RunDetailOut>;
   triggerRun(sessionId: string, body?: TriggerIn): Promise<RunOut>;
   resumeRun(sessionId: string, body?: TriggerIn): Promise<RunOut>;
-  rederive(sessionId: string, body?: RederiveIn): Promise<RederiveOut>;
+  rederive(sessionId: string, body?: RederiveIn): Promise<RederiveResult>;
 }
 
 export function createPipelineApi(config: ApiConfig = defaultConfig()): PipelineApi {
@@ -130,10 +152,33 @@ export function createPipelineApi(config: ApiConfig = defaultConfig()): Pipeline
       apiRequest<RunOut>(`/pipeline/sessions/${sessionId}/runs`, { method: "POST", body }, config),
     resumeRun: (sessionId, body = {}) =>
       apiRequest<RunOut>(`/pipeline/sessions/${sessionId}/resume`, { method: "POST", body }, config),
-    rederive: (sessionId, body = {}) =>
-      apiRequest<RederiveOut>(`/pipeline/sessions/${sessionId}/rederive`, {
-        method: "POST",
-        body,
-      }, config),
+    rederive: async (sessionId, body = {}) => {
+      // Not apiRequest: a blocked re-derive is a decision to show (409 with
+      // structured blockers), not a transport error.
+      const fetchFn = config.fetchFn ?? fetch;
+      const headers: Record<string, string> = {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      };
+      if (config.token) {
+        headers.Authorization = `Bearer ${config.token}`;
+      }
+      const url = `${config.baseUrl.replace(/\/$/, "")}/pipeline/sessions/${sessionId}/rederive`;
+      const response = await fetchFn(url, { method: "POST", headers, body: JSON.stringify(body) });
+      let parsed: unknown;
+      try {
+        parsed = await response.json();
+      } catch {
+        parsed = undefined; // non-JSON body: fall through to the status text
+      }
+      if (response.ok) {
+        return { kind: "done", out: parsed as RederiveOut };
+      }
+      const blocked = response.status === 409 ? blockedDetail(parsed) : null;
+      if (blocked !== null) {
+        return { kind: "blocked", ...blocked };
+      }
+      throw new ApiError(response.status, detailText(parsed, response.statusText));
+    },
   };
 }

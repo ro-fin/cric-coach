@@ -126,7 +126,7 @@ function History({ versions }: { versions: AppSettingsOut[] }) {
             description="The canonical defaults are in force until the first version is saved."
           />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Settings version history table">
             <table data-testid="settings-history" className="w-full border-collapse">
               <caption className="sr-only">Settings versions, oldest first</caption>
               <thead>
@@ -135,7 +135,7 @@ function History({ versions }: { versions: AppSettingsOut[] }) {
                   <th scope="col" className={TH}>Review</th>
                   <th scope="col" className={TH}>Live</th>
                   <th scope="col" className={TH}>Approved by</th>
-                  <th scope="col" className={TH}>Reason</th>
+                  <th scope="col" className={cn(TH, "min-w-48")}>Reason</th>
                   <th scope="col" className={TH}>Saved</th>
                 </tr>
               </thead>

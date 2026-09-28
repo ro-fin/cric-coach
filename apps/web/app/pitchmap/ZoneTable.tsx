@@ -47,7 +47,7 @@ export default function ZoneTable({ cells, selectedCell, onSelectCell }: ZoneTab
             />
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Zone analytics table">
             <table data-testid="zone-table" className="w-full border-collapse text-base">
               <caption className="sr-only">Zone analytics (from the session heatmap)</caption>
               <thead>
