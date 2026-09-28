@@ -20,6 +20,6 @@ describe("SessionsPage route", () => {
     );
     render(<SessionsPage />);
     expect(screen.getByRole("heading", { name: "Sessions" })).toBeInTheDocument();
-    expect(await screen.findByTestId("sessions-empty")).toBeInTheDocument();
+    expect(await screen.findByText("No sessions yet")).toBeInTheDocument();
   });
 });
