@@ -1,7 +1,10 @@
 /** US-K2: pitch-map fetch helpers hit the pinned API surface, honestly, via
- * the single lib/api convention (NEXT_PUBLIC_API_BASE_URL + _TOKEN). */
+ * the single lib/api convention. Expected URLs and headers are built from
+ * `apiBase()` and `authHeaders()`, so these tests hold before and after the
+ * same-origin proxy switch (F2b). */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { apiBase, authHeaders } from "@/lib/api";
 import {
   fetchPlayer,
   fetchSession,
@@ -16,27 +19,24 @@ function okFetch(payload: unknown) {
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  vi.unstubAllEnvs();
 });
 
 describe("fetch helpers", () => {
-  it("fetches the session heatmap via the shared LAN default base", async () => {
+  it("fetches the session heatmap via the shared base and auth headers", async () => {
     const fetchMock = okFetch({ cells: [] });
     vi.stubGlobal("fetch", fetchMock);
     await expect(fetchSessionHeatmap("s-1")).resolves.toEqual({ cells: [] });
-    expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/sessions/s-1/heatmap", {
-      headers: {},
+    expect(fetchMock).toHaveBeenCalledWith(`${apiBase()}/sessions/s-1/heatmap`, {
+      headers: authHeaders(),
     });
   });
 
-  it("prefixes the configured API base and sends the bearer token when set", async () => {
-    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://lab:8000");
-    vi.stubEnv("NEXT_PUBLIC_API_TOKEN", "coach-token");
+  it("fetches the session (honesty flags come with it)", async () => {
     const fetchMock = okFetch({ id: "s-1" });
     vi.stubGlobal("fetch", fetchMock);
     await fetchSession("s-1");
-    expect(fetchMock).toHaveBeenCalledWith("http://lab:8000/sessions/s-1", {
-      headers: { Authorization: "Bearer coach-token" },
+    expect(fetchMock).toHaveBeenCalledWith(`${apiBase()}/sessions/s-1`, {
+      headers: authHeaders(),
     });
   });
 
@@ -44,15 +44,17 @@ describe("fetch helpers", () => {
     const fetchMock = okFetch({ handedness: "left" });
     vi.stubGlobal("fetch", fetchMock);
     await expect(fetchPlayer("p-1")).resolves.toEqual({ handedness: "left" });
-    expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/players/p-1", { headers: {} });
+    expect(fetchMock).toHaveBeenCalledWith(`${apiBase()}/players/p-1`, {
+      headers: authHeaders(),
+    });
   });
 
   it("fetches the tag list for honest no-bounce accounting", async () => {
     const fetchMock = okFetch([{ ball_no: 3 }]);
     vi.stubGlobal("fetch", fetchMock);
     await expect(fetchTags("s-1")).resolves.toEqual([{ ball_no: 3 }]);
-    expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/sessions/s-1/tags", {
-      headers: {},
+    expect(fetchMock).toHaveBeenCalledWith(`${apiBase()}/sessions/s-1/tags`, {
+      headers: authHeaders(),
     });
   });
 
@@ -69,8 +71,8 @@ describe("fetch helpers", () => {
     await expect(fetchTargets("s-1")).resolves.toEqual([
       { line: "off", length: "good", description: "top of off" },
     ]);
-    expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/targets?session_id=s-1", {
-      headers: {},
+    expect(fetchMock).toHaveBeenCalledWith(`${apiBase()}/targets?session_id=s-1`, {
+      headers: authHeaders(),
     });
   });
 

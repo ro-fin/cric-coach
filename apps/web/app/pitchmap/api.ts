@@ -1,7 +1,7 @@
 /**
- * Pitch-map fetch helpers (US-K2). Base URL and bearer token come from the
- * single lib/api convention (NEXT_PUBLIC_API_BASE_URL + NEXT_PUBLIC_API_TOKEN;
- * see apps/web/README.md) so one deployment config serves every feature.
+ * Pitch-map fetch helpers (US-K2). Base URL and auth headers come from the
+ * shared lib/api helpers (`apiBase()`, `authHeaders()`: the same-origin proxy
+ * once F2b lands) so one deployment config serves every feature.
  * Response shapes mirror the API routers exactly: the view renders ONLY what
  * the server returns (US-K4 data parity).
  */

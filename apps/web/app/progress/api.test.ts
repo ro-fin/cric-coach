@@ -10,6 +10,7 @@ import {
   newestReport,
 } from "./api";
 import type { RollupReport } from "./types";
+import { defaultConfig } from "@/lib/api";
 
 const config: ApiConfig = { base: "http://api.test", token: "tok-1" };
 
@@ -134,15 +135,15 @@ describe("loadDashboard", () => {
 });
 
 describe("DEFAULT_CONFIG", () => {
-  it("falls back to the LAN defaults when env is unset", () => {
-    expect(DEFAULT_CONFIG).toEqual({ base: "http://localhost:8000", token: "" });
+  it("mirrors the shared lib/api defaults (same before and after the proxy switch)", () => {
+    const shared = defaultConfig();
+    expect(DEFAULT_CONFIG).toEqual({ base: shared.baseUrl, token: shared.token });
   });
 
-  it("reads the shared NEXT_PUBLIC overrides (lib/api convention) at module load", async () => {
-    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://lab:9000");
-    vi.stubEnv("NEXT_PUBLIC_API_TOKEN", "player-token");
-    vi.resetModules();
-    const fresh = await import("./api");
-    expect(fresh.DEFAULT_CONFIG).toEqual({ base: "http://lab:9000", token: "player-token" });
+  it("sends no Authorization header when the shared token is empty", async () => {
+    const fetchMock = vi.fn(async () => ok([]));
+    vi.stubGlobal("fetch", fetchMock);
+    await fetchMilestones({ base: "/api/cricai", token: "" }, "p1");
+    expect(fetchMock).toHaveBeenCalledWith("/api/cricai/milestones/players/p1", { headers: {} });
   });
 });

@@ -1,14 +1,14 @@
 /**
- * Progress-feature fetch helpers (US-K4). Base URL and bearer token come from
- * the single lib/api convention (NEXT_PUBLIC_API_BASE_URL +
- * NEXT_PUBLIC_API_TOKEN; see apps/web/README.md).
+ * Progress-feature fetch helpers (US-K4). Base URL and token come from the
+ * shared `defaultConfig()` in lib/api (the same-origin proxy once F2b lands,
+ * where the token is empty and no Authorization header is sent).
  *
  * Consumes only the pinned API surface (contract #4): reports, milestones,
  * workload summary, wellness state. Responses pass through UNCHANGED — the
  * dashboard renders exactly what the API returned (US-K4 data-parity).
  */
 
-import { apiBase, apiToken } from "@/lib/api";
+import { defaultConfig } from "@/lib/api";
 import type {
   DashboardData,
   Milestone,
@@ -22,15 +22,17 @@ export type ApiConfig = {
   token: string;
 };
 
-/** Build-time defaults; override per call for tests and multi-lab setups. */
+const SHARED = defaultConfig();
+
+/** The shared lib/api defaults; override per call for tests and multi-lab setups. */
 export const DEFAULT_CONFIG: ApiConfig = {
-  base: apiBase(),
-  token: apiToken(),
+  base: SHARED.baseUrl,
+  token: SHARED.token,
 };
 
 async function getJson<T>(config: ApiConfig, path: string): Promise<T> {
   const response = await fetch(`${config.base}${path}`, {
-    headers: { Authorization: `Bearer ${config.token}` },
+    headers: config.token ? { Authorization: `Bearer ${config.token}` } : {},
   });
   if (!response.ok) {
     throw new Error(`GET ${path} failed: ${response.status}`);
