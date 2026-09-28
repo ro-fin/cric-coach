@@ -4,6 +4,8 @@ import { expectAxeClean } from "@/lib/testing/axe";
 import {
   Badge,
   Button,
+  buttonClassName,
+  LinkButton,
   Card,
   CardBody,
   CardHeader,
@@ -76,6 +78,33 @@ describe("Button", () => {
   });
 });
 
+describe("buttonClassName / LinkButton", () => {
+  it("gives links the button look while they stay links", async () => {
+    const { container } = render(
+      <LinkButton href="/sessions/new" variant="primary" size="lg" className="w-full">
+        Start session
+      </LinkButton>,
+    );
+    const link = screen.getByRole("link", { name: "Start session" });
+    expect(link).toHaveAttribute("href", "/sessions/new");
+    expect(link).toHaveAttribute("data-variant", "primary");
+    expect(link.className).toContain("min-h-14");
+    expect(link.className).toContain("bg-accent");
+    expect(link.className).toContain("w-full");
+    await expectAxeClean(container);
+  });
+
+  it("defaults to the medium size", () => {
+    expect(buttonClassName("secondary")).toContain("min-h-11");
+    render(
+      <LinkButton href="/" variant="ghost">
+        Home
+      </LinkButton>,
+    );
+    expect(screen.getByRole("link", { name: "Home" }).className).toContain("min-h-11");
+  });
+});
+
 describe("Card", () => {
   it("composes header, title and body", async () => {
     const { container } = render(
@@ -89,6 +118,24 @@ describe("Card", () => {
     expect(screen.getByRole("heading", { level: 2, name: "Workload" })).toHaveClass("t");
     expect(screen.getByText("42 balls")).toHaveClass("b");
     expect(container.firstElementChild).toHaveClass("extra");
+    await expectAxeClean(container);
+  });
+
+  it("becomes a named region when labelled by its title", async () => {
+    const { container } = render(
+      <>
+        <Card aria-labelledby="wl-title">
+          <CardHeader>
+            <CardTitle id="wl-title">Workload</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card aria-label="Goal">
+          <CardBody>Hit 10 drives</CardBody>
+        </Card>
+      </>,
+    );
+    expect(screen.getByRole("region", { name: "Workload" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Goal" })).toHaveTextContent("Hit 10 drives");
     await expectAxeClean(container);
   });
 

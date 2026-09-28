@@ -52,7 +52,7 @@ describe("RootLayout (app shell, US-K1)", () => {
     );
     expect(screen.getByText("page content")).toBeInTheDocument();
     // Toasts are available to every page.
-    expect(screen.getByRole("status", { name: "Notifications" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Notifications" })).toBeInTheDocument();
     expect(screen.getAllByText("Not signed in").length).toBeGreaterThan(0);
   });
 

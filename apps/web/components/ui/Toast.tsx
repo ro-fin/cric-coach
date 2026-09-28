@@ -78,8 +78,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div
-        role="status"
+      {/* A labelled live region, not role=status: it is always on screen, and a
+          permanent "status" would read as a page that is still loading. */}
+      <section
         aria-live="polite"
         aria-label="Notifications"
         data-print="hide"
@@ -108,7 +109,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             </button>
           </div>
         ))}
-      </div>
+      </section>
     </ToastContext.Provider>
   );
 }

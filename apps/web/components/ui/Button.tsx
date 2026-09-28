@@ -24,6 +24,17 @@ const SIZES: Record<ButtonSize, string> = {
   lg: "min-h-14 px-6 text-lg",
 };
 
+/** The button look as a class string, for elements that must stay links or labels. */
+export function buttonClassName(variant: ButtonVariant, size: ButtonSize = "md", className?: string): string {
+  return cn(
+    "inline-flex min-w-11 items-center justify-center gap-2 rounded-lg border-2 font-semibold",
+    "transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+    VARIANTS[variant],
+    SIZES[size],
+    className,
+  );
+}
+
 export function Button({
   variant,
   size = "md",
@@ -40,13 +51,7 @@ export function Button({
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       data-variant={variant}
-      className={cn(
-        "inline-flex min-w-11 items-center justify-center gap-2 rounded-lg border-2 font-semibold",
-        "transition-colors disabled:cursor-not-allowed disabled:opacity-60",
-        VARIANTS[variant],
-        SIZES[size],
-        className,
-      )}
+      className={buttonClassName(variant, size, className)}
       {...rest}
     >
       {loading && <LoaderCircle aria-hidden="true" className="size-5 animate-spin" />}

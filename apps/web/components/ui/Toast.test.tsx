@@ -27,7 +27,7 @@ describe("useToast", () => {
       </ToastProvider>,
     );
     fireEvent.click(screen.getByRole("button", { name: "Fire" }));
-    const region = screen.getByRole("status", { name: "Notifications" });
+    const region = screen.getByRole("region", { name: "Notifications" });
     expect(region).toHaveAttribute("aria-live", "polite");
     expect(region).toHaveTextContent("Report published");
     expect(region).toHaveTextContent("Sent to the wall");
@@ -46,7 +46,7 @@ describe("useToast", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Fire" }));
     fireEvent.click(screen.getByRole("button", { name: "Fire" }));
-    const region = screen.getByRole("status", { name: "Notifications" });
+    const region = screen.getByRole("region", { name: "Notifications" });
     expect(region.querySelectorAll('[data-tone="neutral"]')).toHaveLength(2);
     fireEvent.click(screen.getAllByRole("button", { name: "Dismiss: Saved" })[0]);
     expect(region.querySelectorAll('[data-tone="neutral"]')).toHaveLength(1);
