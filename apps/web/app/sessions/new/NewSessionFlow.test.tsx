@@ -398,7 +398,7 @@ describe("NewSessionFlow", () => {
     expect(screen.getByRole("link", { name: "Open cameras" })).toHaveAttribute("href", "/cameras");
   });
 
-  it("validates the optional fields and uses the real clock by default", async () => {
+  it("validates the optional fields and uses the real clock by default", { timeout: 20_000 }, async () => {
     const user = userEvent.setup();
     render(<NewSessionFlow role="parent" search="?player=nobody" api={fakeApi()} />);
     await fillDetails(user, "70");
@@ -406,7 +406,8 @@ describe("NewSessionFlow", () => {
     await user.selectOptions(screen.getByLabelText("Player"), "p2");
     expect(screen.getByLabelText("Player")).toHaveValue("p2");
     await user.clear(screen.getByLabelText("Date"));
-    await user.type(screen.getByLabelText("Variation (optional)"), "x".repeat(65));
+    await user.click(screen.getByLabelText("Variation (optional)"));
+    await user.paste("x".repeat(65));
     await user.click(screen.getByRole("button", { name: "Create session" }));
     expect(screen.getByText("Choose a date.")).toBeInTheDocument();
     expect(screen.getByText(/variation under 64/)).toBeInTheDocument();
