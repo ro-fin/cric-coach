@@ -1,0 +1,4 @@
+# Every text file is stored and checked out with LF endings. The repo is
+# developed on Windows (C:\CricAi) but deployed on Linux, and shell scripts
+# break with CRLF. Git decides text vs binary itself (text=auto).
+* text=auto eol=lf
