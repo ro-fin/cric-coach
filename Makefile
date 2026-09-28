@@ -1,7 +1,7 @@
 PY_PKGS := packages/data packages/vision packages/coaching apps/api apps/worker
 COV_MODS := cricai_data cricai_vision cricai_coaching cricai_api cricai_worker
 
-.PHONY: setup lint typecheck test test-unit test-integration safety golden coverage seed web-lint web-test web-build check all
+.PHONY: setup lint typecheck test test-unit test-integration safety golden coverage seed web-lint web-test web-build contract contract-update check all
 
 setup:
 	uv sync --all-packages
@@ -52,6 +52,14 @@ web-test:
 web-build:
 	cd apps/web && pnpm build
 
-check: lint typecheck test-unit web-lint web-test
+# API contract (Phase 8): the checked-in OpenAPI dump must be current; the web
+# contract test (part of web-test) then pins lib/api.ts to it.
+contract:
+	uv run scripts/dump_openapi.py --check
+
+contract-update:
+	uv run scripts/dump_openapi.py
+
+check: lint typecheck contract test-unit web-lint web-test
 
 all: check test-integration safety golden web-build
