@@ -10,6 +10,7 @@ the seeded app through the API only, as the dashboard does.
 import importlib.util
 import socket
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -25,7 +26,7 @@ _spec.loader.exec_module(dev_stack)
 
 @pytest.fixture
 def seeded(tmp_path: Path) -> tuple[TestClient, "dev_stack.SeedSummary"]:
-    app = dev_stack.make_app(tmp_path / "storage", dev_stack.make_engine())
+    app = dev_stack.make_app(tmp_path / "storage", dev_stack.make_engine(tmp_path / "db"))
     summary = dev_stack.seed_demo(app)
     return TestClient(app), summary
 
@@ -101,7 +102,7 @@ def test_review_queue_holds_the_draft_for_the_coach_only(
 
 
 def test_seed_refuses_a_failed_api_call(tmp_path: Path) -> None:
-    app = dev_stack.make_app(tmp_path / "storage", dev_stack.make_engine())
+    app = dev_stack.make_app(tmp_path / "storage", dev_stack.make_engine(tmp_path / "db"))
     with TestClient(app) as client, pytest.raises(RuntimeError, match="seed POST /players"):
         dev_stack._post(client, "/players", {"name": ""}, dev_stack.PARENT_TOKEN)
 
@@ -127,7 +128,7 @@ def test_banner_names_tokens_and_seed(seeded: tuple[TestClient, object]) -> None
 
 
 def test_dev_reset_restores_the_demo_after_a_change(tmp_path: Path) -> None:
-    app = dev_stack.make_app(tmp_path / "storage", dev_stack.make_engine())
+    app = dev_stack.make_app(tmp_path / "storage", dev_stack.make_engine(tmp_path / "db"))
     dev_stack.mount_dev_reset(app)
     first = dev_stack.seed_demo(app)
     client = TestClient(app)
@@ -157,7 +158,7 @@ def test_dev_reset_restores_the_demo_after_a_change(tmp_path: Path) -> None:
 
 
 def test_dev_reset_is_not_part_of_the_product_api(tmp_path: Path) -> None:
-    app = dev_stack.make_app(tmp_path / "storage", dev_stack.make_engine())
+    app = dev_stack.make_app(tmp_path / "storage", dev_stack.make_engine(tmp_path / "db"))
     assert dev_stack.RESET_PATH not in app.openapi()["paths"]
     dev_stack.mount_dev_reset(app)
     app.openapi_schema = None
@@ -183,3 +184,25 @@ def test_port_in_use_detects_a_listener() -> None:
         _host, port = server.getsockname()
         assert dev_stack.port_in_use("127.0.0.1", port) is True
     assert dev_stack.port_in_use("127.0.0.1", port) is False
+
+
+def test_parallel_requests_from_many_threads_all_succeed(
+    seeded: tuple[TestClient, object],
+) -> None:
+    """The progress page fires five requests at once; a shared in-memory
+    connection answered some with 500 (T4's report). Every thread must get 200."""
+    client, summary = seeded
+    paths = [
+        "/sessions",
+        f"/sessions/{summary.analyzed_session_id}/tags",
+        f"/sessions/{summary.analyzed_session_id}/events",
+        f"/reports?player_id={summary.player_id}&kind=daily",
+        f"/wellness/{summary.player_id}/state",
+    ] * 8
+
+    def hit(path: str) -> int:
+        return client.get(path, headers=dev_stack._auth(dev_stack.PARENT_TOKEN)).status_code
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        statuses = list(pool.map(hit, paths))
+    assert statuses == [200] * len(paths)

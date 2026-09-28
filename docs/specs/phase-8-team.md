@@ -170,6 +170,22 @@ To keep the gate short enough to win the fast-forward race, lint, test and typec
 run in parallel, but `build` must start only after `typecheck` finishes: `next build`
 rewrites `.next/types`, and an overlapping `tsc` then fails with TS6053.
 
+**Push lock (T1, 21:15, proposed by T4).** With three terminals landing every few
+minutes, a green gate can lose the fast-forward race indefinitely (T4: five green gates,
+five rejections). So the final rebase → gate → push is serialized by a lock file:
+
+```bash
+LOCK=/c/CricAi/status/develop.lock
+# wait while someone else holds it (a lock older than 15 min is stale: delete it and say so in your status)
+while [ -f "$LOCK" ] && [ $(( $(date +%s) - $(stat -c %Y "$LOCK") )) -lt 900 ]; do sleep 30; done
+echo "T<N> $(date '+%H:%M:%S')" > "$LOCK"
+git fetch . ; git rebase develop && <gate> && git push . HEAD:develop
+rm -f "$LOCK"                       # always, also when the gate fails
+```
+
+Only the final rebase-gate-push happens under the lock; build and test your work first
+without it. A gate under the lock must be the short parallel form (about 3 minutes).
+
 Never force-push. Never push a red gate to `develop`. Never push to `main`. Commit
 messages end with the attribution line your session gives you. Python gates (`uv run ruff
 check .`, `uv run ruff format --check .`, `uv run mypy packages apps/api/src apps/worker/src

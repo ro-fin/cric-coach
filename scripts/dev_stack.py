@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Local development stack for the dashboard (Phase 8, T1).
 
-Boots the REAL cricai_api app on an in-memory SQLite database, seeds a small,
+Boots the REAL cricai_api app on a throwaway SQLite file, seeds a small,
 honest demo lab through the same rows and API calls the production pipeline
 and the API tests use, then runs the Next.js dev server pointed at it. No
 PostgreSQL, Redis, ffmpeg or camera footage is needed, so it works on the
@@ -71,9 +71,8 @@ from cricai_data.models import BallEvent, BallTag, Base, Clip, Finding, Report
 from cricai_data.models import Session as SessionRow
 from fastapi import APIRouter, FastAPI, Header, HTTPException
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session as OrmSession
-from sqlalchemy.pool import StaticPool
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WEB_DIR = REPO_ROOT / "apps" / "web"
@@ -105,11 +104,26 @@ def _auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def make_engine() -> Engine:
-    """One shared in-memory SQLite database for every thread of this process."""
+def make_engine(directory: Path) -> Engine:
+    """A throwaway SQLite file under ``directory``, one connection per thread.
+
+    A single shared in-memory connection (StaticPool) is NOT safe under uvicorn:
+    sync endpoints run on a threadpool, and the progress page fires five
+    requests at once; concurrent reads on one sqlite3 connection returned
+    garbage (``LookupError: '' is not among the defined enum values``, found by
+    T4). A file lets every thread open its own connection while SQLite does the
+    locking; WAL mode keeps readers from blocking on writers.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
     engine = create_engine(
-        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+        f"sqlite:///{(directory / 'cricai-dev.sqlite3').as_posix()}",
+        connect_args={"check_same_thread": False, "timeout": 30},
     )
+
+    @event.listens_for(engine, "connect")
+    def _wal(dbapi_connection: Any, _record: Any) -> None:
+        dbapi_connection.execute("PRAGMA journal_mode=WAL")
+
     create_all(engine)
     return engine
 
@@ -476,7 +490,7 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - process or
         return 2
 
     storage = Path(tempfile.mkdtemp(prefix="cricai-dev-"))
-    app = make_app(storage, make_engine())
+    app = make_app(storage, make_engine(storage / "db"))
     mount_dev_reset(app)
     summary = None if args.no_seed else seed_demo(app)
     api_base = f"http://{args.host}:{args.api_port}"
@@ -519,6 +533,7 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - process or
             web.wait(timeout=20)
         server.should_exit = True
         thread.join(timeout=10)
+        app.state.engine.dispose()
         shutil.rmtree(storage, ignore_errors=True)
     return 0
 
