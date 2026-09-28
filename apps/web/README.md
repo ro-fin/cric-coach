@@ -60,6 +60,22 @@ CRICAI_API_BASE_URL=http://localhost:8000 pnpm dev
 # then open http://localhost:3000 and sign in
 ```
 
+## Install on the lab tablet (PWA)
+
+The dashboard ships a web app manifest (`public/manifest.webmanifest`) and
+icons (`public/icons`), so "Add to Home screen" / "Install app" opens it
+full-screen like a native app. There is no offline mode: data always comes
+live from the API.
+
+## Production image
+
+`deploy/Dockerfile.web --target runtime` builds a self-contained Next.js
+standalone server (no pnpm or sources inside, runs as `node`). Standalone
+output is opt-in through `CRICAI_WEB_STANDALONE=1`, which that stage sets;
+local builds stay plain `next build` + `next start` (standalone tracing
+needs symlinks, which Windows refuses without Developer Mode). The build and
+run commands are in the header of `deploy/Dockerfile.web`.
+
 ## Design system
 
 - Tokens live in `app/globals.css` (Tailwind CSS v4 `@theme`): `bg`, `surface`,

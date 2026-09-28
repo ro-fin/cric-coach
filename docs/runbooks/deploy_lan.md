@@ -190,6 +190,23 @@ Notes:
   once redis is reachable from the smoke host):
   `uv run scripts/verify_deploy.py --api-base http://lab.local:8000 --web-base http://lab.local:3000`.
 
+### 4.1 Self-contained dashboard image (optional)
+
+Compose builds the dashboard at container start from the bind-mounted repo.
+For a fixed, smaller dashboard image, build the `runtime` target of
+`deploy/Dockerfile.web` from the repo root (Next.js standalone server, no
+sources, runs as an unprivileged user):
+
+```sh
+docker build -f deploy/Dockerfile.web --target runtime \
+  --build-arg NEXT_PUBLIC_CRICAI_MEDIA_BASE=http://lab.local:9000/cricai \
+  -t cricai-web:prod .
+docker run -d -p 3000:3000 -e CRICAI_API_BASE_URL=http://lab.local:8000 cricai-web:prod
+```
+
+`CRICAI_API_BASE_URL` is read at runtime; the media base is baked in at
+build. Not yet built on the lab box (Docker is not running there).
+
 ## 5. Scheduled jobs (crontab)
 
 The periodic jobs (US-J4 nightly baselines, US-L4+G5 weekly drift/rollups,
