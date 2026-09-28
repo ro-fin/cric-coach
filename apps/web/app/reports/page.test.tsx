@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, apiBase, authHeaders } from "@/lib/api";
 import type { Report } from "./api";
 import { reportCacheKey } from "./cache";
-import ExportButtons from "./ExportButtons";
+import ExportButtons, { printAs } from "./ExportButtons";
 import ReportsPage from "./page";
 import { PRINT_STYLES } from "./printStyles";
 
@@ -21,6 +21,10 @@ vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
   return { ...actual, fetchReport: vi.fn() };
 });
+
+vi.mock("./ReportsIndex", () => ({
+  default: ({ search }: { search: string }) => <p>reports index:{search}</p>,
+}));
 
 import { fetchReport } from "./api";
 
@@ -100,17 +104,17 @@ afterEach(() => {
 });
 
 describe("ReportsPage", () => {
-  it("asks for a report when report_id is missing", () => {
-    nav.params = new URLSearchParams();
+  it("lists the reports when report_id is missing", () => {
+    nav.params = new URLSearchParams("player=p2");
     render(<ReportsPage />);
-    expect(screen.getByText(/missing report_id/)).toBeInTheDocument();
+    expect(screen.getByText("reports index:?player=p2")).toBeInTheDocument();
     expect(fetchReportMock).not.toHaveBeenCalled();
   });
 
   it("shows loading, then the report, and caches it under its own id", async () => {
     fetchReportMock.mockResolvedValue(report());
     render(<ReportsPage />);
-    expect(screen.getByText("Loading…")).toBeInTheDocument();
+    expect(screen.getByText("Loading the report")).toBeInTheDocument();
     expect(await screen.findByTestId("positive")).toHaveTextContent("Great effort today.");
     expect(fetchReportMock).toHaveBeenCalledWith("r1");
     expect(screen.queryByTestId("offline-banner")).not.toBeInTheDocument();
@@ -226,6 +230,23 @@ describe("ReportsPage", () => {
     expect(alert).toHaveTextContent(/lab server had an error/i);
     expect(alert).toHaveTextContent("no cached copy");
   });
+
+  it("retries after a failure with no cached copy", async () => {
+    fetchReportMock.mockRejectedValueOnce(new ApiError(503, "unavailable"));
+    fetchReportMock.mockResolvedValue(report());
+    const user = userEvent.setup();
+    render(<ReportsPage />);
+    await user.click(await screen.findByRole("button", { name: "Try again" }));
+    expect(await screen.findByTestId("positive")).toBeInTheDocument();
+    expect(fetchReportMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("badges a blocked report in danger", async () => {
+    fetchReportMock.mockResolvedValue(report({ status: "blocked" }));
+    render(<ReportsPage />);
+    const badge = await screen.findByText("STATUS: BLOCKED");
+    expect(badge).toHaveAttribute("data-tone", "danger");
+  });
 });
 
 describe("ExportButtons", () => {
@@ -305,10 +326,23 @@ describe("ExportButtons", () => {
     clickSpy.mockRestore();
   });
 
-  it("triggers browser print for the print stylesheet path", () => {
-    window.print = vi.fn();
+  it("prints the net-wall sheet or the full report, then clears the mode", () => {
+    const modes: (string | undefined)[] = [];
+    window.print = vi.fn(() => {
+      modes.push(document.documentElement.dataset.printMode);
+    });
     render(<ExportButtons reportId="r1" />);
-    fireEvent.click(screen.getByRole("button", { name: "Print" }));
-    expect(window.print).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Print net-wall sheet" }));
+    fireEvent.click(screen.getByRole("button", { name: "Print full report" }));
+    expect(modes).toEqual(["wall", "full"]);
+    expect(document.documentElement.dataset.printMode).toBeUndefined();
+  });
+
+  it("clears the print mode even when printing throws", () => {
+    window.print = vi.fn(() => {
+      throw new Error("no printer");
+    });
+    expect(() => printAs("wall")).toThrow("no printer");
+    expect(document.documentElement.dataset.printMode).toBeUndefined();
   });
 });

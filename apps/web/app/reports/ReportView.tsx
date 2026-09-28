@@ -10,6 +10,10 @@
  * trends/milestones. An unqualified trend never prints a direction verdict
  * (US-G5: trend claims need >= 3 sessions and >= 30 balls per point).
  *
+ * Net-wall print (see printStyles.ts): the parts a player needs at the crease
+ * carry `data-wall="core"`; everything else is `data-wall="detail"` and
+ * stays off the one-page wall sheet.
+ *
  * Every string is rendered as a React text child, so untrusted or malformed
  * body content is escaped inert. All numbers come verbatim from the body —
  * nothing is computed client-side (US-K4 data parity).
@@ -39,14 +43,17 @@ function Evidence({ evidence, sessionId }: { evidence: EvidenceMap; sessionId: s
     return null;
   }
   return (
-    <ul className="evidence">
+    <ul className="evidence mt-2 flex flex-wrap gap-2">
       {balls.flatMap((ball) =>
         Object.keys(evidence[ball])
           .sort()
           .map((camera) => (
             <li key={`${ball}-${camera}`}>
               {sessionId !== null ? (
-                <a href={`/sessions/${sessionId}?ball=${ball}`}>
+                <a
+                  href={`/sessions/${sessionId}?ball=${ball}`}
+                  className="inline-flex min-h-11 items-center rounded-lg border-2 border-border bg-surface-raised px-3 font-semibold text-ink"
+                >
                   ball {ball} - {camera}
                 </a>
               ) : (
@@ -72,9 +79,9 @@ function Correction({
   sessionId: string | null;
 }) {
   return (
-    <section>
-      <h2>{title}</h2>
-      <p>{item.text}</p>
+    <section data-wall="core" className="rounded-xl border border-border bg-surface p-4">
+      <h2 className="mb-2 text-xl font-semibold">{title}</h2>
+      <p className="text-lg">{item.text}</p>
       <Evidence evidence={item.evidence} sessionId={sessionId} />
     </section>
   );
@@ -84,8 +91,8 @@ function Correction({
  * flagged, plus the kid-first fun-block predicate. Numbers verbatim (US-K4). */
 function BattingSplitTable({ split }: { split: BattingSplit }) {
   return (
-    <section data-testid="batting-split">
-      <h2>Plan vs actual</h2>
+    <section data-testid="batting-split" data-wall="detail" className="rounded-xl border border-border bg-surface p-4">
+      <h2 className="mb-2 text-xl font-semibold">Plan vs actual</h2>
       <table>
         <thead>
           <tr>
@@ -124,10 +131,10 @@ function Bowling({ bowling }: { bowling: BowlingSection }) {
   const agreement = bowling.variation_agreement;
   const workload = bowling.workload;
   return (
-    <section data-testid="bowling">
-      <h2>Leg-spin session</h2>
+    <section data-testid="bowling" data-wall="detail" className="rounded-xl border border-border bg-surface p-4">
+      <h2 className="mb-2 text-xl font-semibold">Leg-spin session</h2>
       <section data-testid="bowling-accuracy">
-        <h3>Accuracy scorecard</h3>
+        <h3 className="mt-3 mb-1 font-semibold">Accuracy scorecard</h3>
         <table>
           <thead>
             <tr>
@@ -161,7 +168,7 @@ function Bowling({ bowling }: { bowling: BowlingSection }) {
         <p>{scorecard.note}</p>
       </section>
       <section data-testid="bowling-scatter">
-        <h3>Release scatter</h3>
+        <h3 className="mt-3 mb-1 font-semibold">Release scatter</h3>
         <p>
           {scatter.n} measured · mean {cmText(scatter.mean_cm)} · sigma {cmText(scatter.sigma_cm)}{" "}
           · range {cmText(scatter.min_cm)} to {cmText(scatter.max_cm)}
@@ -188,7 +195,7 @@ function Bowling({ bowling }: { bowling: BowlingSection }) {
         <p>{scatter.note}</p>
       </section>
       <section data-testid="bowling-agreement">
-        <h3>Variation agreement</h3>
+        <h3 className="mt-3 mb-1 font-semibold">Variation agreement</h3>
         <p>
           {agreement.agreement_pct === null
             ? "Not enough compared deliveries for an agreement number"
@@ -218,7 +225,7 @@ function Bowling({ bowling }: { bowling: BowlingSection }) {
       </section>
       {bowling.learning_modules.length > 0 && (
         <section data-testid="bowling-modules">
-          <h3>Legend lessons</h3>
+          <h3 className="mt-3 mb-1 font-semibold">Legend lessons</h3>
           {bowling.learning_modules.map((module) => (
             <article key={module.kind}>
               <h4>
@@ -235,7 +242,7 @@ function Bowling({ bowling }: { bowling: BowlingSection }) {
         </section>
       )}
       <section data-testid="bowling-workload">
-        <h3>Workload vs ceiling</h3>
+        <h3 className="mt-3 mb-1 font-semibold">Workload vs ceiling</h3>
         {workload === null ? (
           <p>Workload data unavailable for this session.</p>
         ) : (
@@ -270,26 +277,39 @@ export default function ReportView({
   sessionId?: string | null;
 }) {
   return (
-    <article className="report-view" data-kind={body.kind}>
-      <header>
-        <h1>{body.kind} report</h1>
-        <p>
+    <article className="report-view flex flex-col gap-4 text-ink" data-kind={body.kind}>
+      <header data-wall="core">
+        <h1 className="text-3xl font-bold capitalize">{body.kind} report</h1>
+        <p className="text-ink-muted">
           {body.period.start} to {body.period.end}
         </p>
       </header>
       {body.safety !== null && body.safety.active && (
-        <section data-testid="safety">
-          <h2>Safety first</h2>
-          <p>{body.safety.text}</p>
+        <section
+          data-testid="safety"
+          data-wall="core"
+          role="alert"
+          className="rounded-xl border-2 border-danger bg-surface p-4 text-danger"
+        >
+          <h2 className="mb-2 text-xl font-semibold">Safety first</h2>
+          <p className="text-lg font-semibold">{body.safety.text}</p>
         </section>
       )}
       {body.honesty_banner !== null && (
-        <p className="honesty-banner" data-testid="honesty-banner">
+        <p
+          className="honesty-banner rounded-xl border-2 border-warning p-3 font-semibold"
+          data-testid="honesty-banner"
+          data-wall="core"
+        >
           {body.honesty_banner}
         </p>
       )}
       {body.coverage_note !== null && (
-        <p className="coverage-note" data-testid="coverage-note">
+        <p
+          className="coverage-note rounded-xl border border-warning p-3"
+          data-testid="coverage-note"
+          data-wall="core"
+        >
           {body.coverage_note}
         </p>
       )}
@@ -297,22 +317,22 @@ export default function ReportView({
         <Correction title="Main correction" item={body.main_correction} sessionId={sessionId} />
       )}
       {body.drill !== null && (
-        <section data-testid="drill">
-          <h2>Tomorrow&apos;s drill</h2>
-          <p>{body.drill.text}</p>
+        <section data-testid="drill" data-wall="core" className="rounded-xl border border-border bg-surface p-4">
+          <h2 className="mb-2 text-xl font-semibold">Tomorrow&apos;s drill</h2>
+          <p className="text-lg">{body.drill.text}</p>
         </section>
       )}
       {body.goal !== null && (
-        <section data-testid="goal">
-          <h2>Goal</h2>
-          <p>
+        <section data-testid="goal" data-wall="core" className="rounded-xl border border-border bg-surface p-4">
+          <h2 className="mb-2 text-xl font-semibold">Goal</h2>
+          <p className="text-lg">
             {body.goal.metric}: reach {body.goal.target ?? "coach-set"} next session.
           </p>
         </section>
       )}
       {body.fatigue_note !== null && (
-        <section data-testid="fatigue">
-          <h2>Fatigue check</h2>
+        <section data-testid="fatigue" data-wall="detail" className="rounded-xl border border-border bg-surface p-4">
+          <h2 className="mb-2 text-xl font-semibold">Fatigue check</h2>
           <p>{body.fatigue_note.text}</p>
           <p>
             Last {body.fatigue_note.window} balls · control drop{" "}
@@ -324,9 +344,9 @@ export default function ReportView({
       )}
       {body.batting_split !== undefined && <BattingSplitTable split={body.batting_split} />}
       {body.secondary.length > 0 && (
-        <details className="secondary">
-          <summary>Also worth a look</summary>
-          <ul>
+        <details className="secondary rounded-xl border border-border bg-surface p-4" data-wall="detail">
+          <summary className="min-h-11 cursor-pointer font-semibold">Also worth a look</summary>
+          <ul className="mt-2 flex flex-col gap-3">
             {body.secondary.map((item) => (
               <li key={item.finding_id}>
                 {item.text}
@@ -336,13 +356,13 @@ export default function ReportView({
           </ul>
         </details>
       )}
-      <section data-testid="positive">
-        <h2>What went well</h2>
-        <p>{body.positive}</p>
+      <section data-testid="positive" data-wall="core" className="rounded-xl border border-border bg-surface p-4">
+        <h2 className="mb-2 text-xl font-semibold">What went well</h2>
+        <p className="text-lg text-success">{body.positive}</p>
       </section>
       {body.claims.length > 0 && (
-        <section data-testid="claims">
-          <h2>Numbers in this report</h2>
+        <section data-testid="claims" data-wall="detail" className="rounded-xl border border-border bg-surface p-4">
+          <h2 className="mb-2 text-xl font-semibold">Numbers in this report</h2>
           <table>
             <thead>
               <tr>
@@ -367,8 +387,8 @@ export default function ReportView({
       )}
       {body.bowling !== undefined && <Bowling bowling={body.bowling} />}
       {body.trends !== undefined && body.trends.length > 0 && (
-        <section data-testid="trends">
-          <h2>Trends</h2>
+        <section data-testid="trends" data-wall="detail" className="rounded-xl border border-border bg-surface p-4">
+          <h2 className="mb-2 text-xl font-semibold">Trends</h2>
           <ul>
             {body.trends.map((trend) => (
               <li key={`${trend.metric}-${trend.zone_key ?? "all"}`}>
@@ -383,8 +403,8 @@ export default function ReportView({
         </section>
       )}
       {body.milestones !== undefined && body.milestones.length > 0 && (
-        <section data-testid="milestones">
-          <h2>Milestones</h2>
+        <section data-testid="milestones" data-wall="detail" className="rounded-xl border border-border bg-surface p-4">
+          <h2 className="mb-2 text-xl font-semibold">Milestones</h2>
           <ul>
             {body.milestones.map((milestone) => (
               <li key={`${milestone.kind}-${milestone.metric}-${milestone.achieved_on}`}>

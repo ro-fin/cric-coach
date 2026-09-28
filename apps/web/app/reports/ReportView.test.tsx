@@ -240,6 +240,24 @@ describe("ReportView", () => {
     expect(safety.compareDocumentPosition(banner) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it("marks the net-wall core and leaves the detail off the wall sheet", () => {
+    const { container } = render(<ReportView body={fullBody()} />);
+    const wall = (testId: string) => screen.getByTestId(testId).getAttribute("data-wall");
+    for (const core of ["safety", "honesty-banner", "coverage-note", "drill", "goal", "positive"]) {
+      expect(wall(core), core).toBe("core");
+    }
+    for (const detail of ["fatigue", "claims", "trends", "milestones"]) {
+      expect(wall(detail), detail).toBe("detail");
+    }
+    expect(screen.getByRole("heading", { name: "Main correction" }).closest("section")).toHaveAttribute(
+      "data-wall",
+      "core",
+    );
+    expect(container.querySelector("details.secondary")).toHaveAttribute("data-wall", "detail");
+    // an active safety verdict is announced, not just printed
+    expect(screen.getByTestId("safety")).toHaveAttribute("role", "alert");
+  });
+
   it("renders the honest empty body with only header and positive", () => {
     render(<ReportView body={emptyBody()} />);
     expect(screen.getByTestId("positive")).toBeInTheDocument();

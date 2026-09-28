@@ -233,6 +233,19 @@ export async function fetchReport(id: string): Promise<Report> {
   return (await response.json()) as Report;
 }
 
+/** `GET /reports?player_id&kind` (routers/reports.py list_reports): newest
+ * period first; a player token receives only PUBLISHED reports. */
+export async function listReports(
+  playerId: string,
+  kind: "daily" | "weekly" | "monthly" | null = null,
+): Promise<Report[]> {
+  const query = new URLSearchParams({ player_id: playerId });
+  if (kind !== null) query.set("kind", kind);
+  const response = await fetch(`${apiBase()}/reports?${query}`, { headers: authHeaders() });
+  if (!response.ok) throw new ApiError(response.status, "report list failed");
+  return (await response.json()) as Report[];
+}
+
 /** Server-side PDF/PNG export endpoint for this report (US-K5). */
 export function exportUrl(id: string, format: "pdf" | "png"): string {
   return `${apiBase()}/reports/${id}/export?format=${format}`;

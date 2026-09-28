@@ -5,7 +5,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, apiBase, authHeaders } from "@/lib/api";
-import { exportUrl, fetchReport } from "./api";
+import { exportUrl, fetchReport, listReports } from "./api";
 
 const fetchMock = vi.fn();
 
@@ -36,6 +36,26 @@ describe("fetchReport", () => {
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).status).toBe(404);
     expect((error as ApiError).message).toBe("API 404: report fetch failed");
+  });
+});
+
+describe("listReports", () => {
+  it("lists one player's reports, optionally one kind", async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => [] } as unknown as Response);
+    await expect(listReports("p1")).resolves.toEqual([]);
+    expect(fetchMock).toHaveBeenLastCalledWith(`${apiBase()}/reports?player_id=p1`, {
+      headers: authHeaders(),
+    });
+    await listReports("p1", "weekly");
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      `${apiBase()}/reports?player_id=p1&kind=weekly`,
+      { headers: authHeaders() },
+    );
+  });
+
+  it("throws ApiError carrying the status", async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 403 } as unknown as Response);
+    await expect(listReports("p1")).rejects.toMatchObject({ status: 403 });
   });
 });
 
