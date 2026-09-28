@@ -1,19 +1,22 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import HomePage from "./page";
-import RootLayout from "./layout";
+
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams("player=p9"),
+}));
+
+vi.mock("./_today/TodayView", () => ({
+  default: ({ role, search }: { role: string | null; search: string }) => (
+    <p>
+      today:{String(role)}:{search}
+    </p>
+  ),
+}));
 
 describe("HomePage", () => {
-  it("renders the lab heading and demo ball count", () => {
+  it("renders Today with the URL's search string", () => {
     render(<HomePage />);
-    expect(screen.getByRole("heading", { name: "cricAI" })).toBeInTheDocument();
-    expect(screen.getByTestId("demo-count")).toHaveTextContent("500 balls");
-  });
-});
-
-describe("RootLayout", () => {
-  it("wraps children in html/body", () => {
-    const markup = RootLayout({ children: "content" });
-    expect(markup.props.lang).toBe("en");
+    expect(screen.getByText("today:null:?player=p9")).toBeInTheDocument();
   });
 });

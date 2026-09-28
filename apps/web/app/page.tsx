@@ -1,11 +1,21 @@
-import { formatBallCount } from "@/lib/format";
+"use client";
+
+/** Today (home) route: `/?player=<id>` picks the player (default: first listed). */
+
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
+import TodayView from "./_today/TodayView";
+
+function TodayRoute() {
+  const params = useSearchParams();
+  // Role arrives with the Phase 8 shell (useRole); until then Start session stays hidden.
+  return <TodayView role={null} search={`?${params.toString()}`} />;
+}
 
 export default function HomePage() {
   return (
-    <main>
-      <h1>cricAI</h1>
-      <p>Home cricket lab — sessions, per-ball analysis, daily coaching report.</p>
-      <p data-testid="demo-count">{formatBallCount(500)}</p>
-    </main>
+    <Suspense fallback={null}>
+      <TodayRoute />
+    </Suspense>
   );
 }
