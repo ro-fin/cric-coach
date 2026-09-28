@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { expectAxeClean } from "@/lib/testing/axe";
+import { expectNoA11yViolations as expectAxeClean } from "@/test/axe";
 import { COPY } from "./copy";
 import type { WorkloadWindow } from "./types";
 import { WorkloadPanel } from "./WorkloadPanel";

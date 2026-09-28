@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { expectAxeClean } from "@/lib/testing/axe";
+import { expectNoA11yViolations as expectAxeClean } from "@/test/axe";
 import { COPY } from "./copy";
 import ProgressPage from "./page";
 import type { Milestone, RollupReport, TrendSeries, WorkloadWindow } from "./types";

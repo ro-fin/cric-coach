@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "./api";
 import { MARGIN, SVG_WIDTH } from "./geometry";
 import PitchMapView from "./PitchMapView";
-import { expectAxeClean } from "@/lib/testing/axe";
+import { expectNoA11yViolations as expectAxeClean } from "@/test/axe";
 
 vi.mock("./api");
 
