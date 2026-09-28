@@ -5,6 +5,7 @@ import {
   CHART_HEIGHT,
   CHART_PAD,
   CHART_WIDTH,
+  directionTone,
   placePoints,
   TrendChart,
 } from "./TrendChart";
@@ -105,5 +106,14 @@ describe("TrendChart", () => {
   it("renders nothing for a series without points", () => {
     const { container } = render(<TrendChart trend={trend({ points: [] })} />);
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("directionTone", () => {
+  it("colours served directions and keeps unqualified series neutral", () => {
+    expect(directionTone("improving", true)).toBe("success");
+    expect(directionTone("flat", true)).toBe("neutral");
+    expect(directionTone("regressing", true)).toBe("warning");
+    expect(directionTone("regressing", false)).toBe("neutral");
   });
 });

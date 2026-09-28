@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { expectAxeClean } from "@/lib/testing/axe";
 import { COPY } from "./copy";
 import ProgressPage from "./page";
 import type { Milestone, RollupReport, TrendSeries, WorkloadWindow } from "./types";
@@ -187,7 +188,7 @@ describe("ProgressPage parent view (US-K4)", () => {
     }
     // Workload numbers, verbatim from the summary API.
     expect(screen.getByTestId("overs")).toHaveTextContent("13.5");
-    expect(screen.getByTestId("overs")).toHaveTextContent("16.");
+    expect(screen.getByTestId("ceiling")).toHaveTextContent("16");
     expect(screen.getByTestId("remaining")).toHaveTextContent("15");
     // No client-side rounding anywhere.
     expect(screen.queryByText("0.57")).not.toBeInTheDocument();
@@ -201,7 +202,7 @@ describe("ProgressPage parent view (US-K4)", () => {
     const view = await screen.findByTestId("parent-view");
     const panel = screen.getByTestId("workload-panel");
     expect(view.firstElementChild).toBe(panel);
-    expect(panel).toHaveStyle({ position: "sticky" });
+    expect(panel).toHaveClass("sticky");
   });
 
   it("notes the suspect-session exclusion and flags unqualified trends", async () => {
@@ -297,5 +298,82 @@ describe("ProgressPage kid mode (US-K4 SAF)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: COPY.toggleToParent }));
     expect(await screen.findByTestId("parent-view")).toBeInTheDocument();
+  });
+});
+
+describe("ProgressPage honest states on the primitives", () => {
+  it("announces the loading skeleton", () => {
+    visit("?player=p1");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => new Promise(() => undefined)),
+    );
+    render(<ProgressPage />);
+    expect(screen.getByRole("status")).toHaveTextContent(COPY.loading);
+    expect(screen.queryByRole("button", { name: COPY.toggleToKid })).not.toBeInTheDocument();
+  });
+
+  it("points a missing player to the sessions list", async () => {
+    visit("");
+    stubApi();
+    render(<ProgressPage />);
+    await screen.findByTestId("missing-player");
+    expect(screen.getByRole("link", { name: COPY.pickPlayerAction })).toHaveAttribute(
+      "href",
+      "/sessions",
+    );
+  });
+
+  it("retries a failed load and then shows the dashboard", async () => {
+    visit("?player=p1");
+    let calls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        calls += 1;
+        if (calls <= 5) {
+          throw new Error("connection refused");
+        }
+        const payload = url.includes("/wellness/") ? { pain_active: false } : [];
+        return { ok: true, status: 200, json: async () => payload };
+      }),
+    );
+    render(<ProgressPage />);
+    await screen.findByTestId("load-failed");
+    fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+    expect(await screen.findByTestId("parent-view")).toBeInTheDocument();
+  });
+
+  it("shows the report honesty banner verbatim in the degraded banner", async () => {
+    visit("?player=p1");
+    const banner = "Two sessions were left out: calibration warning.";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        const payload = (() => {
+          if (url.includes("kind=weekly"))
+            return [{ ...weekly, body: { ...weekly.body, honesty_banner: banner } }];
+          if (url.includes("/wellness/")) return { pain_active: false };
+          return [];
+        })();
+        return { ok: true, status: 200, json: async () => payload };
+      }),
+    );
+    render(<ProgressPage />);
+    const region = await screen.findByRole("region", { name: "Incomplete data" });
+    expect(region).toHaveTextContent(banner);
+  });
+
+  it("renames the page in kid mode and stays axe clean in both views", async () => {
+    visit("?player=p1");
+    stubApi();
+    const { container } = render(<ProgressPage />);
+    await screen.findByTestId("parent-view");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(COPY.title);
+    await expectAxeClean(container);
+    fireEvent.click(screen.getByRole("button", { name: COPY.toggleToKid }));
+    await screen.findByTestId("kid-view");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(COPY.kidTitle);
+    await expectAxeClean(container);
   });
 });

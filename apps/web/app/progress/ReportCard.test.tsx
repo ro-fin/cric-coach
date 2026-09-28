@@ -54,3 +54,16 @@ describe("ReportCard", () => {
     );
   });
 });
+
+describe("ReportCard status badge", () => {
+  it("marks a published report with the success tone and names the card", () => {
+    render(<ReportCard report={{ ...weekly(), status: "published" }} />);
+    expect(screen.getByText("published")).toHaveAttribute("data-tone", "success");
+    expect(screen.getByRole("region", { name: "weekly report" })).toBeInTheDocument();
+  });
+
+  it("keeps draft and blocked reports neutral", () => {
+    render(<ReportCard report={weekly()} />);
+    expect(screen.getByText("draft")).toHaveAttribute("data-tone", "neutral");
+  });
+});

@@ -4,11 +4,12 @@
  *
  * No charting deps, no client-side metric computation: every number shown is
  * a value the API returned, rendered verbatim (US-K4 data-parity). Geometry
- * (pixel coordinates) is presentation, not data.
+ * (pixel coordinates) is presentation, not data. Colours come from tokens.
  */
 
+import { Badge, type BadgeTone } from "@/components/ui";
 import { COPY } from "./copy";
-import type { TrendPoint, TrendSeries } from "./types";
+import type { TrendDirection, TrendPoint, TrendSeries } from "./types";
 
 export const CHART_WIDTH = 320;
 export const CHART_HEIGHT = 140;
@@ -50,6 +51,17 @@ function shadePolygon(placed: PlacedPoint[]): string {
   return `${first.x},${floor} ${polyline(placed)} ${last.x},${floor}`;
 }
 
+const DIRECTION_TONES: Readonly<Record<TrendDirection, BadgeTone>> = {
+  improving: "success",
+  flat: "neutral",
+  regressing: "warning",
+};
+
+/** Badge tone for a served direction; an unqualified series stays neutral. */
+export function directionTone(direction: TrendDirection, qualified: boolean): BadgeTone {
+  return qualified ? DIRECTION_TONES[direction] : "neutral";
+}
+
 export function TrendChart({ trend }: { trend: TrendSeries }) {
   if (trend.points.length === 0) {
     return null; // a series exists only once a baseline point exists
@@ -59,51 +71,66 @@ export function TrendChart({ trend }: { trend: TrendSeries }) {
     <figure
       aria-label={`trend ${trend.metric} ${trend.zone_key}`}
       data-testid={`trend-${trend.metric}-${trend.zone_key}`}
+      className="flex flex-col gap-2 rounded-xl border border-border bg-surface-raised p-4"
     >
-      <figcaption>
-        <span>{trend.metric}</span> <span>({trend.zone_key})</span>{" "}
+      <figcaption className="flex flex-wrap items-center gap-2">
+        <span className="font-semibold text-ink">{trend.metric}</span>{" "}
+        <span className="text-ink-muted">({trend.zone_key})</span>{" "}
         {/* US-G5 guard: a direction verdict needs a qualified series (>= 3
             sessions, >= 30 balls/point) — an unqualified one says so instead. */}
         <span
           data-testid="direction"
           data-direction={trend.qualified ? trend.direction : "unqualified"}
         >
-          {trend.qualified ? trend.direction : COPY.unqualifiedDirection}
+          <Badge tone={directionTone(trend.direction, trend.qualified)}>
+            {trend.qualified ? trend.direction : COPY.unqualifiedDirection}
+          </Badge>
         </span>
       </figcaption>
       <svg
         role="img"
+        aria-label={`${trend.metric} values over time`}
         viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-        width={CHART_WIDTH}
-        height={CHART_HEIGHT}
+        className="h-auto w-full max-w-xl"
       >
         {trend.qualified && (
           <polygon
             data-testid="confidence-shade"
             points={shadePolygon(placed)}
-            fill="currentColor"
-            opacity={0.12}
+            className="fill-accent"
+            fillOpacity={0.14}
           />
         )}
         <polyline
           points={polyline(placed)}
           fill="none"
-          stroke="currentColor"
+          strokeWidth={2}
+          className={trend.qualified ? "stroke-accent" : "stroke-ink-muted"}
           strokeDasharray={trend.qualified ? undefined : "4 3"}
         />
         {placed.map(({ x, y, point }) => (
           <g key={point.date}>
-            <circle cx={x} cy={y} r={3} />
-            <text x={x} y={y - 8} fontSize={9} textAnchor="middle">
+            <circle cx={x} cy={y} r={3.5} strokeWidth={1} className="fill-accent stroke-surface" />
+            <text x={x} y={y - 8} fontSize={9} textAnchor="middle" className="fill-ink">
               {point.value}
             </text>
-            <text x={x} y={CHART_HEIGHT - 6} fontSize={8} textAnchor="middle">
+            <text
+              x={x}
+              y={CHART_HEIGHT - 6}
+              fontSize={8}
+              textAnchor="middle"
+              className="fill-ink-muted"
+            >
               n={point.n}
             </text>
           </g>
         ))}
       </svg>
-      {!trend.qualified && <p data-testid="unqualified-note">{COPY.unqualifiedNote}</p>}
+      {!trend.qualified && (
+        <p data-testid="unqualified-note" className="text-sm text-ink-muted">
+          {COPY.unqualifiedNote}
+        </p>
+      )}
     </figure>
   );
 }
