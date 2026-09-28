@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { expectAxeClean } from "@/lib/testing/axe";
+import { expectNoA11yViolations } from "@/test/axe";
 import { TOAST_DURATION_MS, ToastProvider, useToast, type ToastInput } from "./Toast";
 
 function Trigger({ input }: { input: ToastInput }) {
@@ -84,6 +84,6 @@ describe("toast accessibility", () => {
       </ToastProvider>,
     );
     fireEvent.click(screen.getByRole("button", { name: "Fire" }));
-    await expectAxeClean(container);
+    await expectNoA11yViolations(container);
   });
 });

@@ -12,6 +12,7 @@ export { DegradedBanner, type DegradedBannerProps } from "./DegradedBanner";
 export { Dialog, type DialogProps } from "./Dialog";
 export { EmptyState, type EmptyStateProps } from "./EmptyState";
 export { ErrorState, type ErrorStateProps } from "./ErrorState";
+export { ForbiddenState, rolesText, type ForbiddenStateProps } from "./ForbiddenState";
 export { LinkButton, type LinkButtonProps } from "./LinkButton";
 export { PageHeader, type PageHeaderProps } from "./PageHeader";
 export { Skeleton, type SkeletonProps } from "./Skeleton";

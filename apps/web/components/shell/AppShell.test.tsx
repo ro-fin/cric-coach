@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RoleProvider, type Role } from "@/lib/auth/role";
-import { expectAxeClean } from "@/lib/testing/axe";
+import { expectNoA11yViolations } from "@/test/axe";
 import { AppShell } from "./AppShell";
 
 const navigation = vi.hoisted(() => ({ pathname: "/" as string | null }));
@@ -66,7 +66,7 @@ describe("AppShell", () => {
     expect(within(primary).getByRole("link", { name: "Today" })).not.toHaveAttribute("aria-current");
     const tabs = screen.getByRole("navigation", { name: "Tabs" });
     expect(within(tabs).getAllByRole("link")).toHaveLength(4);
-    await expectAxeClean(container);
+    await expectNoA11yViolations(container);
   });
 
   it("shows the signed-in role, or that nobody is signed in", () => {

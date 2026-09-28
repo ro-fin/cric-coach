@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { expectAxeClean } from "@/lib/testing/axe";
+import { expectNoA11yViolations } from "@/test/axe";
 import { LoginForm } from "./LoginForm";
 import LoginPage, { metadata } from "./page";
 
@@ -33,7 +33,7 @@ describe("LoginPage", () => {
     const page = await LoginPage({ searchParams: Promise.resolve({ next: "//evil.example" }) });
     const { container } = render(page);
     expect(screen.getByRole("heading", { level: 1, name: "Sign in to cricAI" })).toBeInTheDocument();
-    await expectAxeClean(container);
+    await expectNoA11yViolations(container);
     fill("Coach", "c-tok");
     await waitFor(() => expect(browser.hardNavigate).toHaveBeenCalledWith("/"));
     expect(metadata.title).toBe("Sign in — cricAI");

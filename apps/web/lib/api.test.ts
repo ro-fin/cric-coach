@@ -10,6 +10,7 @@ import {
   createApiClient,
   defaultConfig,
   defaultMediaBase,
+  detailText,
   listReviewQueue,
   publishReport,
   ReviewQueueItemOut,
@@ -345,5 +346,54 @@ describe("apiRequest", () => {
     expect(error).toBeInstanceOf(ApiError);
     expect(error.status).toBe(403);
     expect(error.message).toBe("API 403: requires one of: [parent]");
+  });
+});
+
+describe("detailText (FastAPI detail as one line)", () => {
+  it.each([
+    ["a string, verbatim", { detail: "invalid token" }, "invalid token"],
+    [
+      "validation problems as field: message",
+      {
+        detail: [
+          { loc: ["body", "soreness"], msg: "Input should be less than 6", type: "less_than" },
+          { loc: ["query"], msg: "bad query", type: "x" },
+          { msg: "no location", type: "x" },
+          "plain problem",
+          { odd: true },
+        ],
+      },
+      'soreness: Input should be less than 6; bad query; no location; plain problem; {"odd":true}',
+    ],
+    [
+      "an object as message then key: values",
+      { detail: { unknown_cameras: ["C7", "C9"], message: "Unknown cameras", count: 2, empty: [], nested: { a: 1 } } },
+      "Unknown cameras — unknown_cameras: C7, C9 — count: 2",
+    ],
+    ["an empty list as the status text", { detail: [] }, "Unprocessable Entity"],
+    ["an empty object as the status text", { detail: { nested: {} } }, "Unprocessable Entity"],
+    ["a number as the status text", { detail: 7 }, "Unprocessable Entity"],
+    ["a body without detail as the status text", { error: "x" }, "Unprocessable Entity"],
+    ["no body as the status text", undefined, "Unprocessable Entity"],
+  ])("renders %s", (_label, body, expected) => {
+    expect(detailText(body, "Unprocessable Entity")).toBe(expected);
+  });
+
+  it("is what apiRequest throws for a structured 422", async () => {
+    const fetchFn = fakeFetch(
+      jsonResponse({ detail: { message: "Checklist incomplete", missing: ["helmet"] } }, 422),
+    );
+    const error = (await apiRequest("/sessions/s1/start", { method: "POST" }, { ...CONFIG, fetchFn }).catch(
+      (e: unknown) => e,
+    )) as ApiError;
+    expect(error.message).toBe("API 422: Checklist incomplete — missing: helmet");
+  });
+
+  it("accepts boolean query values", async () => {
+    const fetchFn = fakeFetch(jsonResponse([]));
+    await apiRequest("/alerts", { query: { acknowledged: false, include_history: true } }, { ...CONFIG, fetchFn });
+    expect((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe(
+      "http://lab:8000/alerts?acknowledged=false&include_history=true",
+    );
   });
 });

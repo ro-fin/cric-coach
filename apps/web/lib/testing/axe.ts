@@ -1,15 +1,6 @@
 /**
- * Interim axe check for the design-system tests, until T1's test/axe.ts
- * (expectNoA11yViolations) lands on develop. jsdom cannot compute colours, so
- * contrast is checked against the token palette instead; "region" is off
- * because primitives are rendered outside any page landmark.
+ * Deprecated alias kept so older tests compile: use `expectNoA11yViolations`
+ * from `@/test/axe` (T1's shared helper, same rule set). Remove once no test
+ * imports this module.
  */
-import axe from "axe-core";
-import { expect } from "vitest";
-
-export async function expectAxeClean(container: Element): Promise<void> {
-  const results = await axe.run(container, {
-    rules: { "color-contrast": { enabled: false }, region: { enabled: false } },
-  });
-  expect(results.violations.map((violation) => violation.id)).toEqual([]);
-}
+export { expectNoA11yViolations as expectAxeClean } from "@/test/axe";

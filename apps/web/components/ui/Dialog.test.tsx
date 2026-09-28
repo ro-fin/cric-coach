@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { expectAxeClean } from "@/lib/testing/axe";
+import { expectNoA11yViolations } from "@/test/axe";
 import { Dialog } from "./Dialog";
 
 function Harness({ withField = true }: { withField?: boolean }) {
@@ -33,7 +33,7 @@ describe("Dialog", () => {
     const dialog = screen.getByRole("dialog", { name: "Edit note" });
     expect(dialog).toHaveAttribute("aria-modal", "true");
     expect(screen.getByRole("button", { name: "Close" })).toHaveFocus();
-    await expectAxeClean(container);
+    await expectNoA11yViolations(container);
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(opener).toHaveFocus();

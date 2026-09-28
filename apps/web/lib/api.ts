@@ -236,21 +236,62 @@ export interface ApiClient {
   ballMetrics(sessionId: string, ballNo: number): Promise<PhaseMetricsOut[]>;
 }
 
-async function errorDetail(response: Response): Promise<string> {
-  try {
-    const body: unknown = await response.json();
-    if (
-      typeof body === "object" &&
-      body !== null &&
-      "detail" in body &&
-      typeof (body as { detail: unknown }).detail === "string"
-    ) {
-      return (body as { detail: string }).detail;
-    }
-  } catch {
-    // non-JSON body: fall through to the status text
+/** One FastAPI validation problem ({ loc, msg }) as "field: message". */
+function problemText(item: unknown): string {
+  if (typeof item === "string") {
+    return item;
   }
-  return response.statusText;
+  if (typeof item === "object" && item !== null && typeof (item as { msg?: unknown }).msg === "string") {
+    const { loc, msg } = item as { loc?: unknown; msg: string };
+    // Drop the request-part prefix ("body", "query", ...): the field path is what matters.
+    const field = Array.isArray(loc) ? loc.slice(1).join(".") : "";
+    return field ? `${field}: ${msg}` : msg;
+  }
+  return JSON.stringify(item);
+}
+
+/**
+ * A FastAPI `detail` as one honest line, the server's words kept verbatim:
+ * a string as is; a list of problems as "field: message; ..."; an object as
+ * its `message` followed by "key: a, b" for each other scalar or list entry
+ * (e.g. "Unknown cameras — unknown_cameras: C7, C9"). Anything else, or no
+ * readable detail, falls back to the HTTP status text.
+ */
+export function detailText(body: unknown, fallback: string): string {
+  if (typeof body !== "object" || body === null || !("detail" in body)) {
+    return fallback;
+  }
+  const detail = (body as { detail: unknown }).detail;
+  if (typeof detail === "string") {
+    return detail;
+  }
+  if (Array.isArray(detail)) {
+    return detail.length > 0 ? detail.map(problemText).join("; ") : fallback;
+  }
+  if (typeof detail === "object" && detail !== null) {
+    const parts: string[] = [];
+    for (const [key, value] of Object.entries(detail)) {
+      if (key === "message" && typeof value === "string") {
+        parts.unshift(value);
+      } else if (Array.isArray(value) && value.length > 0) {
+        parts.push(`${key}: ${value.map(String).join(", ")}`);
+      } else if (["string", "number", "boolean"].includes(typeof value)) {
+        parts.push(`${key}: ${String(value)}`);
+      }
+    }
+    return parts.length > 0 ? parts.join(" — ") : fallback;
+  }
+  return fallback;
+}
+
+async function errorDetail(response: Response): Promise<string> {
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    body = undefined; // non-JSON body: fall through to the status text
+  }
+  return detailText(body, response.statusText);
 }
 
 /** Authorization header for a config's token; none when the token is empty (proxy mode). */
@@ -258,12 +299,11 @@ function bearer(config: ApiConfig): Record<string, string> {
   return config.token ? { Authorization: `Bearer ${config.token}` } : {};
 }
 
+/** Query values; undefined entries are left out of the URL. */
+export type ApiQuery = Record<string, string | number | boolean | undefined>;
+
 /** `base + path + ?query`, without undefined params. Works for relative (proxy) bases. */
-function buildUrl(
-  config: ApiConfig,
-  path: string,
-  query: Record<string, string | number | undefined>,
-): string {
+function buildUrl(config: ApiConfig, path: string, query: ApiQuery): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {
     if (value !== undefined) {
@@ -276,7 +316,7 @@ function buildUrl(
 
 export interface ApiRequestInit {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-  query?: Record<string, string | number | undefined>;
+  query?: ApiQuery;
   /** JSON-serialised request body. */
   body?: unknown;
 }

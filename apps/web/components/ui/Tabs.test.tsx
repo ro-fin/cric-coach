@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { expectAxeClean } from "@/lib/testing/axe";
+import { expectNoA11yViolations } from "@/test/axe";
 import { Tab, TabList, TabPanel, Tabs } from "./Tabs";
 
 function Example(props: { value?: string; onValueChange?: (value: string) => void }) {
@@ -36,7 +36,7 @@ describe("Tabs", () => {
     expect(panel).toHaveAttribute("aria-labelledby", front.id);
     expect(front).toHaveAttribute("aria-controls", panel.id);
     expect(front.id).not.toMatch(/ /);
-    await expectAxeClean(container);
+    await expectNoA11yViolations(container);
   });
 
   it("selects on click", () => {

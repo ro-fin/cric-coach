@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { expectAxeClean } from "@/lib/testing/axe";
+import { expectNoA11yViolations } from "@/test/axe";
 import {
   Badge,
   Button,
@@ -34,7 +34,7 @@ describe("Button", () => {
       expect(button.className).toContain("min-h-11");
       fireEvent.click(button);
       expect(onClick).toHaveBeenCalledOnce();
-      await expectAxeClean(container);
+      await expectNoA11yViolations(container);
     },
   );
 
@@ -63,7 +63,7 @@ describe("Button", () => {
     expect(button).toHaveAttribute("aria-busy", "true");
     fireEvent.click(button);
     expect(onClick).not.toHaveBeenCalled();
-    await expectAxeClean(container);
+    await expectNoA11yViolations(container);
   });
 
   it("honours disabled without loading", () => {
@@ -91,7 +91,7 @@ describe("buttonClassName / LinkButton", () => {
     expect(link.className).toContain("min-h-14");
     expect(link.className).toContain("bg-accent");
     expect(link.className).toContain("w-full");
-    await expectAxeClean(container);
+    await expectNoA11yViolations(container);
   });
 
   it("defaults to the medium size", () => {
@@ -118,7 +118,7 @@ describe("Card", () => {
     expect(screen.getByRole("heading", { level: 2, name: "Workload" })).toHaveClass("t");
     expect(screen.getByText("42 balls")).toHaveClass("b");
     expect(container.firstElementChild).toHaveClass("extra");
-    await expectAxeClean(container);
+    await expectNoA11yViolations(container);
   });
 
   it("becomes a named region when labelled by its title", async () => {
@@ -136,7 +136,7 @@ describe("Card", () => {
     );
     expect(screen.getByRole("region", { name: "Workload" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Goal" })).toHaveTextContent("Hit 10 drives");
-    await expectAxeClean(container);
+    await expectNoA11yViolations(container);
   });
 
   it("works without extra classes", () => {
@@ -164,7 +164,7 @@ describe("Badge", () => {
       const badge = screen.getByText(tone);
       expect(badge).toHaveAttribute("data-tone", tone);
       expect(badge).toHaveClass("x");
-      await expectAxeClean(container);
+      await expectNoA11yViolations(container);
     },
   );
 });
@@ -178,7 +178,7 @@ describe("Skeleton", () => {
     expect(lines).toHaveLength(3);
     expect(lines[2]).toHaveClass("w-2/3");
     expect(lines[0]).toHaveClass("w-full");
-    await expectAxeClean(container);
+    await expectNoA11yViolations(container);
   });
 
   it("draws a single full-width line", () => {
@@ -202,7 +202,7 @@ describe("EmptyState", () => {
     expect(screen.getByRole("heading", { name: "No sessions yet" })).toBeInTheDocument();
     expect(screen.getByText("Record a session to see it here.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "New session" })).toBeInTheDocument();
-    await expectAxeClean(container);
+    await expectNoA11yViolations(container);
   });
 
   it("renders the title alone", () => {
@@ -219,7 +219,7 @@ describe("ErrorState", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("API 500: boom");
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(onRetry).toHaveBeenCalledOnce();
-    await expectAxeClean(container);
+    await expectNoA11yViolations(container);
   });
 
   it("omits the retry button without a handler", () => {
@@ -235,7 +235,7 @@ describe("DegradedBanner", () => {
     const region = screen.getByRole("region", { name: "Incomplete data" });
     const items = region.querySelectorAll("li");
     expect(Array.from(items, (item) => item.textContent)).toEqual(reasons);
-    await expectAxeClean(container);
+    await expectNoA11yViolations(container);
   });
 
   it("renders nothing when there is no reason", () => {
@@ -259,7 +259,7 @@ describe("PageHeader", () => {
       "data-print",
       "hide",
     );
-    await expectAxeClean(container);
+    await expectNoA11yViolations(container);
   });
 
   it("renders the title alone", () => {
@@ -278,7 +278,7 @@ describe("StatTile", () => {
     expect(screen.getByText("21.4")).toBeInTheDocument();
     expect(screen.getByText("m/s")).toBeInTheDocument();
     expect(screen.getByText("Confidence 82%")).toBeInTheDocument();
-    await expectAxeClean(container);
+    await expectNoA11yViolations(container);
   });
 
   it("shows the reason instead of a dash when the value is null", () => {

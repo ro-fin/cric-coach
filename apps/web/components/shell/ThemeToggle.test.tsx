@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { expectAxeClean } from "@/lib/testing/axe";
+import { expectNoA11yViolations } from "@/test/axe";
 import { THEME_STORAGE_KEY, ThemeToggle } from "./ThemeToggle";
 
 function mockSystemDark(dark: boolean | undefined) {
@@ -24,7 +24,7 @@ describe("ThemeToggle", () => {
     const button = screen.getByRole("button", { name: "Dark theme" });
     expect(button).toHaveAttribute("aria-pressed", "true");
     expect(document.documentElement.dataset.theme).toBe("dark");
-    await expectAxeClean(container);
+    await expectNoA11yViolations(container);
     fireEvent.click(button);
     expect(button).toHaveAttribute("aria-pressed", "false");
     expect(document.documentElement.dataset.theme).toBe("light");
