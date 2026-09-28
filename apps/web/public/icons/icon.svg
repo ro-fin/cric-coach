@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="cricAI">
+  <defs>
+    <radialGradient id="leather" cx="0.38" cy="0.34" r="0.75">
+      <stop offset="0" stop-color="#d9493b"/>
+      <stop offset="1" stop-color="#9c1c12"/>
+    </radialGradient>
+    <clipPath id="ball"><circle cx="256" cy="256" r="150"/></clipPath>
+  </defs>
+  <rect width="512" height="512" fill="#0f6b45"/>
+  <circle cx="256" cy="256" r="150" fill="url(#leather)"/>
+  <g clip-path="url(#ball)" transform="rotate(-35 256 256)" stroke="#f5f7f3" stroke-linecap="round" fill="none">
+    <path d="M241 100c-8 100-8 212 0 312M271 100c8 100 8 212 0 312" stroke-width="9"/>
+    <path d="M232 140h-14M229 180h-14M228 220h-14M228 260h-14M228 300h-14M229 340h-14M232 380h-14M280 140h14M283 180h14M284 220h14M284 260h14M284 300h14M283 340h14M280 380h14" stroke-width="6"/>
+  </g>
+</svg>

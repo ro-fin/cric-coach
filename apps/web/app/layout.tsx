@@ -8,6 +8,17 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "cricAI — Home Cricket Lab",
   description: "Per-ball analysis, coaching reports and safe workloads",
+  applicationName: "cricAI",
+  // Installable on the lab tablet (public/manifest.webmanifest).
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/icons/icon.svg", type: "image/svg+xml" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: "/icons/apple-touch-icon.png",
+  },
+  appleWebApp: { capable: true, title: "cricAI", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {

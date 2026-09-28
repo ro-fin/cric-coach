@@ -1,13 +1,60 @@
-# cricAI web provisioning image (Phase-7 fx1, findings 22/29).
+# cricAI web images (Phase-7 fx1 findings 22/29; Phase 8 standalone runtime).
 #
-# pnpm is provisioned (version-pinned) at BUILD time via corepack — the old
-# start-command `corepack enable pnpm` fetched pnpm from the npm registry on
-# first use, so an offline container recreation could not even reach
-# `pnpm install`. Node deps still install at container start into the named
-# node_modules volumes (lockfile-pinned; warm volumes make it a no-op).
-# Build once, online:
-#   docker compose -f deploy/docker-compose.yaml build
-FROM node:22-bookworm-slim
+# Three targets share one pnpm-provisioned base:
+#
+#   provision (default, what docker-compose.yaml builds, context deploy/)
+#     pnpm is provisioned (version-pinned) at BUILD time via corepack: the old
+#     start-command `corepack enable pnpm` fetched pnpm from the npm registry
+#     on first use, so an offline container recreation could not even reach
+#     `pnpm install`. Node deps install at container start into the named
+#     node_modules volumes (lockfile-pinned; warm volumes make it a no-op).
+#       docker compose -f deploy/docker-compose.yaml build
+#
+#   runtime (self-contained production image, context = repo root)
+#     Next.js standalone output: node + the traced server bundle, no pnpm, no
+#     source, no dev dependencies, running as the unprivileged `node` user.
+#     The dashboard holds no API token; each device signs in at /login.
+#       docker build -f deploy/Dockerfile.web --target runtime \
+#         --build-arg NEXT_PUBLIC_CRICAI_MEDIA_BASE=http://lab.local:9000/cricai \
+#         -t cricai-web:prod .
+#       docker run -p 3000:3000 -e CRICAI_API_BASE_URL=http://lab.local:8000 cricai-web:prod
+#     CRICAI_API_BASE_URL is read at runtime (server-only); the media base is
+#     inlined at build time.
+#
+# BuildKit builds only the stages a target needs, so the compose build never
+# touches the repo-root COPY steps below.
 
+FROM node:22-bookworm-slim AS base
 # Pin the workspace's pnpm (pnpm-lock.yaml lockfileVersion 9.0).
 RUN corepack enable && corepack prepare pnpm@10.8.1 --activate
+
+FROM base AS build
+WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    CRICAI_WEB_STANDALONE=1
+COPY pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY apps/web/package.json apps/web/
+RUN pnpm install --frozen-lockfile
+COPY apps/web apps/web
+ARG NEXT_PUBLIC_CRICAI_MEDIA_BASE=http://localhost:9000/cricai
+ENV NEXT_PUBLIC_CRICAI_MEDIA_BASE=${NEXT_PUBLIC_CRICAI_MEDIA_BASE}
+RUN pnpm --dir apps/web build
+
+FROM node:22-bookworm-slim AS runtime
+WORKDIR /app
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    PORT=3000 \
+    HOSTNAME=0.0.0.0 \
+    CRICAI_API_BASE_URL=http://localhost:8000
+COPY --from=build --chown=node:node /app/apps/web/.next/standalone ./
+COPY --from=build --chown=node:node /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=build --chown=node:node /app/apps/web/public ./apps/web/public
+USER node
+EXPOSE 3000
+HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
+  CMD ["node", "-e", "fetch('http://127.0.0.1:3000/login').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+CMD ["node", "apps/web/server.js"]
+
+# Default target (last stage): the provisioning image docker-compose.yaml uses.
+FROM base AS provision

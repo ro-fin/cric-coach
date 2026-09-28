@@ -1,0 +1,16 @@
+# Build context filter for deploy/Dockerfile.web (BuildKit reads
+# <Dockerfile>.dockerignore next to the Dockerfile). The runtime target only
+# needs the workspace manifests, the lockfile and apps/web sources.
+**/node_modules
+**/.next
+**/coverage
+**/.env
+**/.env.*
+.git
+.venv
+datasets
+models
+packages
+apps/api
+apps/worker
+testsupport
