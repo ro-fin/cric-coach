@@ -6,6 +6,7 @@ import {
   FORWARDED_REQUEST_HEADERS,
   proxy,
   readSessionCookie,
+  requestOrigin,
 } from "./proxy";
 
 const API = "http://api.lab:8000";
@@ -213,6 +214,52 @@ describe("proxy auth", () => {
       { fetchFn: upstream(200), apiBaseUrl: API },
     );
     expect(response.headers.get("set-cookie")).toMatch(/; Secure$/);
+  });
+
+  it("accepts a same-origin sign-in when next start's request.url says localhost (regression)", async () => {
+    // Under `next start`, request.url carries the bind address, not the host the
+    // tablet used; the Origin must be compared with the Host header instead.
+    const response = await proxy(
+      new Request("http://localhost:3000/api/cricai/_session", {
+        method: "POST",
+        headers: {
+          host: "lab.local:3000",
+          origin: "http://lab.local:3000",
+          "content-type": "application/json",
+        },
+        body: '{"role":"parent","token":"p"}',
+      }),
+      ["_session"],
+      { fetchFn: upstream(200), apiBaseUrl: API },
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get("set-cookie")).not.toMatch(/Secure/);
+  });
+
+  it("honours X-Forwarded-Host/Proto behind a TLS reverse proxy", async () => {
+    const response = await proxy(
+      new Request("http://localhost:3000/api/cricai/_session", {
+        method: "POST",
+        headers: {
+          host: "localhost:3000",
+          "x-forwarded-host": "cricai.lab, inner",
+          "x-forwarded-proto": "https",
+          origin: "https://cricai.lab",
+          "content-type": "application/json",
+        },
+        body: '{"role":"parent","token":"p"}',
+      }),
+      ["_session"],
+      { fetchFn: upstream(200), apiBaseUrl: API },
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get("set-cookie")).toMatch(/; Secure$/);
+  });
+
+  it("falls back to request.url when no Host header is present", () => {
+    const request = new Request("http://dash.lab:3000/api/cricai/x");
+    request.headers.delete("host");
+    expect(requestOrigin(request)).toBe("http://dash.lab:3000");
   });
 
   it("refuses cross-origin state changes", async () => {

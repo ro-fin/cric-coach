@@ -73,8 +73,26 @@ function cookieHeader(value: string, secure: boolean, maxAge?: number): string {
   ].join("; ");
 }
 
+/** First value of a possibly comma-joined forwarding header. */
+function forwarded(request: Request, name: string): string | null {
+  return request.headers.get(name)?.split(",")[0].trim() || null;
+}
+
+/**
+ * The origin the browser actually used. Not request.url: `next start` builds
+ * that from its own bind address (e.g. localhost), so a tablet on
+ * http://lab.local:3000 would never match it. Host, or X-Forwarded-Host/Proto
+ * behind a reverse proxy, is what the browser sent.
+ */
+export function requestOrigin(request: Request): string {
+  const url = new URL(request.url);
+  const host = forwarded(request, "x-forwarded-host") ?? request.headers.get("host") ?? url.host;
+  const proto = forwarded(request, "x-forwarded-proto") ?? url.protocol.slice(0, -1);
+  return `${proto}://${host}`;
+}
+
 function isSecure(request: Request): boolean {
-  return new URL(request.url).protocol === "https:";
+  return requestOrigin(request).startsWith("https://");
 }
 
 function clearCookie(request: Request, headers: Headers = new Headers()): Headers {
@@ -97,7 +115,7 @@ export function readSessionCookie(request: Request): string | undefined {
 /** State-changing calls must come from this origin (SameSite=Strict is the first line; this is the second). */
 function crossOrigin(request: Request): boolean {
   const origin = request.headers.get("origin");
-  return origin !== null && origin !== new URL(request.url).origin;
+  return origin !== null && origin !== requestOrigin(request);
 }
 
 /** Path segments must be plain names: no empty, dot or reserved (_) segments. */
