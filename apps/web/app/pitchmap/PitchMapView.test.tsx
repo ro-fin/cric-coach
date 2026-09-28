@@ -3,8 +3,9 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "./api";
-import { MARGIN, NO_DATA_FILL, SVG_WIDTH } from "./geometry";
+import { MARGIN, SVG_WIDTH } from "./geometry";
 import PitchMapView from "./PitchMapView";
+import { expectAxeClean } from "@/lib/testing/axe";
 
 vi.mock("./api");
 
@@ -66,7 +67,13 @@ const HEATMAP: api.SessionHeatmap = {
   ],
 };
 
-const SESSION: api.SessionInfo = { id: "s-1", player_id: "p-1", session_date: "2026-07-01" };
+const SESSION: api.SessionInfo = {
+  id: "s-1",
+  player_id: "p-1",
+  session_date: "2026-07-01",
+  degraded: false,
+  missing_views: [],
+};
 const RH_PLAYER: api.PlayerInfo = {
   id: "p-1",
   name: "Veera",
@@ -212,10 +219,10 @@ describe("overlay toggles and frames", () => {
   it("toggles control coloring, bounce points and the legend", async () => {
     primeApi();
     render(<PitchMapView sessionId="s-1" />);
-    expect(await screen.findByTestId("legend-line")).toHaveTextContent("ball density");
+    expect(await screen.findByTestId("legend-line")).toHaveTextContent("more balls in that cell");
     fireEvent.click(screen.getByLabelText("control coloring"));
     expect(screen.getByTestId("legend-line")).toHaveTextContent("control %");
-    expect(screen.getByTestId("cell-middle-full")).toHaveAttribute("fill", NO_DATA_FILL);
+    expect(screen.getByTestId("cell-middle-full")).toHaveClass("fill-border");
     expect(screen.getByTestId("point-1")).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("bounce points"));
     expect(screen.queryByTestId("point-1")).not.toBeInTheDocument();
@@ -259,5 +266,89 @@ describe("overlay toggles and frames", () => {
     expect(screen.getByTestId("off-side-label")).toHaveAttribute("x", String(MARGIN / 4));
     fireEvent.click(screen.getByLabelText("batting end (bowler far)"));
     expect(screen.getByText("bowler end (far)")).toBeInTheDocument();
+  });
+});
+
+describe("honest states on the primitives", () => {
+  it("labels the skeleton for screen readers", () => {
+    vi.mocked(api.fetchSessionHeatmap).mockReturnValue(new Promise(() => {}));
+    vi.mocked(api.fetchSession).mockReturnValue(new Promise(() => {}));
+    vi.mocked(api.fetchTags).mockReturnValue(new Promise(() => {}));
+    vi.mocked(api.fetchTargets).mockReturnValue(new Promise(() => {}));
+    render(<PitchMapView sessionId="s-1" />);
+    expect(screen.getByRole("status")).toHaveTextContent("Loading pitch map");
+  });
+
+  it("retries after a failure and then renders the map", async () => {
+    primeApi();
+    vi.mocked(api.fetchSessionHeatmap).mockRejectedValueOnce(new Error("offline"));
+    render(<PitchMapView sessionId="s-1" />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("offline");
+    fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+    expect(await screen.findByTestId("player-line")).toBeInTheDocument();
+    expect(api.fetchSessionHeatmap).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows the empty state with a way back when nothing was tagged or placed", async () => {
+    primeApi();
+    vi.mocked(api.fetchSessionHeatmap).mockResolvedValue({
+      ...HEATMAP,
+      total_balls: 0,
+      cells: [],
+      points: [],
+      flagged_balls: [],
+    });
+    vi.mocked(api.fetchTags).mockResolvedValue([]);
+    render(<PitchMapView sessionId="s-1" />);
+    const empty = await screen.findByTestId("pitchmap-empty");
+    expect(empty).toHaveTextContent("No balls on the map yet");
+    expect(screen.getAllByTestId("session-link")).toHaveLength(2);
+    expect(screen.queryByTestId("pitch-map-svg")).not.toBeInTheDocument();
+  });
+
+  it("keeps the map for tagged balls without bounces", async () => {
+    primeApi();
+    vi.mocked(api.fetchSessionHeatmap).mockResolvedValue({
+      ...HEATMAP,
+      total_balls: 0,
+      cells: [],
+      points: [],
+      flagged_balls: [],
+    });
+    render(<PitchMapView sessionId="s-1" />);
+    expect(await screen.findByTestId("zone-table-empty")).toBeInTheDocument();
+    expect(screen.getByTestId("no-bounce-link-7")).toBeInTheDocument();
+  });
+
+  it("shows missing camera views verbatim in the degraded banner", async () => {
+    primeApi();
+    vi.mocked(api.fetchSession).mockResolvedValue({
+      ...SESSION,
+      degraded: true,
+      missing_views: ["C3"],
+    });
+    render(<PitchMapView sessionId="s-1" />);
+    const banner = await screen.findByRole("region", { name: "Incomplete data" });
+    expect(banner).toHaveTextContent("missing camera view: C3");
+  });
+
+  it("shows the degraded banner on the empty state too", async () => {
+    primeApi();
+    vi.mocked(api.fetchSession).mockResolvedValue({ ...SESSION, degraded: true });
+    vi.mocked(api.fetchSessionHeatmap).mockResolvedValue({ ...HEATMAP, total_balls: 0 });
+    vi.mocked(api.fetchTags).mockResolvedValue([]);
+    render(<PitchMapView sessionId="s-1" />);
+    await screen.findByTestId("pitchmap-empty");
+    expect(screen.getByRole("region", { name: "Incomplete data" })).toHaveTextContent(
+      "session is marked degraded",
+    );
+  });
+
+  it("marks a guest batter with a badge and has no axe violations", async () => {
+    primeApi({ player: LH_GUEST, targets: [] });
+    const { container } = render(<PitchMapView sessionId="s-1" />);
+    await screen.findByTestId("player-line");
+    expect(screen.getByText("guest")).toBeInTheDocument();
+    await expectAxeClean(container);
   });
 });

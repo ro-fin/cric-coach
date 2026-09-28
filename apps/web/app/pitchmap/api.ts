@@ -48,6 +48,9 @@ export interface SessionInfo {
   id: string;
   player_id: string;
   session_date: string;
+  /** SessionOut honesty fields: a capture that lost cameras stays visible. */
+  degraded: boolean;
+  missing_views: string[];
 }
 
 export interface PlayerInfo {

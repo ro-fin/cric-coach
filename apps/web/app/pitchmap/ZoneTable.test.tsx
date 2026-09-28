@@ -47,11 +47,11 @@ describe("ZoneTable", () => {
     expect(row).toHaveTextContent("4 / 2");
   });
 
-  it("shows unknowable percentages as an em dash, never as 0%", () => {
+  it("says unknowable percentages in words, never as 0%", () => {
     render(<ZoneTable cells={CELLS} selectedCell={null} onSelectCell={vi.fn()} />);
     const row = screen.getByTestId("zone-row-off-full");
     expect(row).toHaveTextContent("1 ball");
-    expect(row).toHaveTextContent("—");
+    expect(row).toHaveTextContent("no tagged balls");
     expect(row).not.toHaveTextContent("0%");
   });
 

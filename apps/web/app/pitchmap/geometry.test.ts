@@ -5,17 +5,17 @@ import {
   cellRect,
   densityT,
   HALF_WIDTH_M,
-  labelColor,
   MARGIN,
-  NO_DATA_FILL,
+  NO_DATA_CLASS,
   offSideIsRight,
   PITCH_LENGTH_M,
   project,
+  shadeOpacity,
   SVG_HEIGHT,
   SVG_WIDTH,
-  viridis,
   X_SCALE,
   Y_SCALE,
+  zoneBgClass,
 } from "./geometry";
 
 describe("project", () => {
@@ -90,30 +90,27 @@ describe("offSideIsRight", () => {
   });
 });
 
-describe("color scales", () => {
-  it("hits the viridis anchors at the extremes and clamps out-of-range t", () => {
-    expect(viridis(0)).toBe("rgb(68, 1, 84)");
-    expect(viridis(1)).toBe("rgb(253, 231, 37)");
-    expect(viridis(-0.5)).toBe("rgb(68, 1, 84)");
-    expect(viridis(2)).toBe("rgb(253, 231, 37)");
-  });
-
-  it("interpolates between anchors", () => {
-    expect(viridis(0.125)).toBe(`rgb(${64}, ${42}, ${112})`); // halfway 0 -> 0.25
-  });
-
+describe("shading", () => {
   it("scales density against the busiest cell, safely when the map is empty", () => {
     expect(densityT(3, 6)).toBeCloseTo(0.5);
     expect(densityT(0, 0)).toBe(0);
   });
 
-  it("flips the count-label colour for bright cells", () => {
-    expect(labelColor(0.4)).toBe("#ffffff");
-    expect(labelColor(0.9)).toBe("#000000");
+  it("maps a shade to an opacity that keeps a faint tint and clamps", () => {
+    expect(shadeOpacity(0)).toBe(0.12);
+    expect(shadeOpacity(0.5)).toBe(0.56);
+    expect(shadeOpacity(1)).toBe(1);
+    expect(shadeOpacity(-1)).toBe(0.12);
+    expect(shadeOpacity(3)).toBe(1);
   });
 
-  it("exposes a neutral no-data fill distinct from the ramp", () => {
-    expect(NO_DATA_FILL).toBe("#9ca3af");
+  it("uses the border token for cells with no tagged balls", () => {
+    expect(NO_DATA_CLASS).toBe("fill-border");
+  });
+
+  it("gives each zone a swatch token and unknown labels the border tone", () => {
+    expect(zoneBgClass("good")).toBe("bg-zone-good");
+    expect(zoneBgClass("beamer")).toBe("bg-border");
   });
 });
 

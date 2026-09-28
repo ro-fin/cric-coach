@@ -117,39 +117,21 @@ export function offSideIsRight(frame: EndFrame, handedness: HandednessKey): bool
   return (frame === "batting_end") === (handedness === "right");
 }
 
-// Viridis anchors (parity with the server PNG's colormap).
-const VIRIDIS_ANCHORS: readonly (readonly [number, number, number])[] = [
-  [68, 1, 84],
-  [59, 82, 139],
-  [33, 145, 140],
-  [94, 201, 98],
-  [253, 231, 37],
-];
-
-/** Sequential viridis-like ramp over t in [0, 1] (clamped). */
-export function viridis(t: number): string {
-  const clamped = Math.min(Math.max(t, 0), 1);
-  const scaled = clamped * (VIRIDIS_ANCHORS.length - 1);
-  const idx = Math.min(Math.floor(scaled), VIRIDIS_ANCHORS.length - 2);
-  const frac = scaled - idx;
-  const [r0, g0, b0] = VIRIDIS_ANCHORS[idx];
-  const [r1, g1, b1] = VIRIDIS_ANCHORS[idx + 1];
-  const lerp = (a: number, b: number): number => Math.round(a + (b - a) * frac);
-  return `rgb(${lerp(r0, r1)}, ${lerp(g0, g1)}, ${lerp(b0, b1)})`;
-}
-
-/** Neutral fill for cells whose shading metric is unknowable (no tagged balls). */
-export const NO_DATA_FILL = "#9ca3af";
-
-/** Density shading: share of the busiest cell (0 when the map is empty). */
+/** Density shading: share of the busiest cell (0 when the map is empty).
+ * Presentation only: it sets a fill opacity, it is never shown as a number. */
 export function densityT(count: number, peak: number): number {
   return peak > 0 ? count / peak : 0;
 }
 
-/** Count-label colour flips for contrast: viridis runs dark -> bright. */
-export function labelColor(t: number): string {
-  return t > 0.5 ? "#000000" : "#ffffff";
+/** Fill opacity for a shading value in [0, 1] (clamped). An empty cell keeps
+ * a faint zone tint so the band stays readable. */
+export function shadeOpacity(t: number): number {
+  const clamped = Math.min(Math.max(t, 0), 1);
+  return Math.round((0.12 + 0.88 * clamped) * 1000) / 1000;
 }
+
+/** Fill for cells whose control shading is unknowable (no tagged balls). */
+export const NO_DATA_CLASS = "fill-border";
 
 // Design tokens (contract 3.1). Literal class names so Tailwind finds them.
 /** SVG fill per length zone, from the zone-* tokens. */
@@ -176,4 +158,17 @@ export function zoneFillClass(length: string): string {
 /** Line colour for a wire line label; an unknown label gets the muted ink. */
 export function lineTextClass(line: string): string {
   return (LINE_TEXT_CLASS as Record<string, string>)[line] ?? "text-ink-muted";
+}
+
+/** Swatch background per length zone (legend and zone table). */
+export const ZONE_BG_CLASS: Readonly<Record<LengthKey, string>> = {
+  yorker: "bg-zone-yorker",
+  full: "bg-zone-full",
+  good: "bg-zone-good",
+  short: "bg-zone-short",
+};
+
+/** Swatch for a wire length label; an unknown label gets the border tone. */
+export function zoneBgClass(length: string): string {
+  return (ZONE_BG_CLASS as Record<string, string>)[length] ?? "bg-border";
 }

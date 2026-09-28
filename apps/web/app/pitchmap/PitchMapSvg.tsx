@@ -1,9 +1,12 @@
 /**
- * SVG pitch map (US-K2): zone cells shaded by density or control, bounce
- * points to physical scale, declared target-zone outlines, both end frames,
- * handedness-mirrored cell geometry. Every number shown comes from the API.
+ * SVG pitch map (US-K2): zone cells filled with their length-zone token and
+ * shaded by density or control, bounce points to physical scale, declared
+ * target-zone outlines, both end frames, handedness-mirrored cell geometry.
+ * Every number shown comes from the API; every colour comes from a token
+ * class, so light, dark and print follow the design system.
  */
 
+import { cn } from "@/lib/cn";
 import type { BouncePoint, BowlingTarget, HeatmapCell } from "./api";
 import {
   cellRect,
@@ -11,20 +14,20 @@ import {
   type EndFrame,
   HALF_WIDTH_M,
   type HandednessKey,
-  labelColor,
   LENGTHS,
   type LengthKey,
   LINES,
   type LineKey,
   MARGIN,
-  NO_DATA_FILL,
+  NO_DATA_CLASS,
   offSideIsRight,
   PITCH_LENGTH_M,
   POPPING_CREASE_OFFSET_M,
   project,
+  shadeOpacity,
   SVG_HEIGHT,
   SVG_WIDTH,
-  viridis,
+  zoneFillClass,
 } from "./geometry";
 
 export interface CellKeyPair {
@@ -49,29 +52,27 @@ interface PitchMapSvgProps {
   onSelectCell: (cell: CellKeyPair) => void;
 }
 
-function cellFill(cell: HeatmapCell | undefined, peak: number, colorByControl: boolean): string {
-  if (colorByControl) {
-    // Control shading is unknowable without tagged balls: neutral, never 0%.
-    if (cell === undefined || cell.control_pct === null) {
-      return NO_DATA_FILL;
-    }
-    return viridis(cell.control_pct / 100);
-  }
-  return viridis(densityT(cell === undefined ? 0 : cell.balls, peak));
+interface CellShade {
+  className: string;
+  opacity: number;
 }
 
-function cellLabelColor(
+/** Zone token for the band; opacity carries the API's density or control %.
+ * Control shading is unknowable without tagged balls: neutral, never 0%. */
+function cellShade(
+  length: LengthKey,
   cell: HeatmapCell | undefined,
   peak: number,
   colorByControl: boolean,
-): string {
+): CellShade {
   if (colorByControl) {
     if (cell === undefined || cell.control_pct === null) {
-      return "#000000";
+      return { className: NO_DATA_CLASS, opacity: 1 };
     }
-    return labelColor(cell.control_pct / 100);
+    return { className: zoneFillClass(length), opacity: shadeOpacity(cell.control_pct / 100) };
   }
-  return labelColor(densityT(cell === undefined ? 0 : cell.balls, peak));
+  const balls = cell === undefined ? 0 : cell.balls;
+  return { className: zoneFillClass(length), opacity: shadeOpacity(densityT(balls, peak)) };
 }
 
 function creaseLines(frame: EndFrame): { x1: number; y1: number; x2: number; y2: number }[] {
@@ -85,6 +86,15 @@ function creaseLines(frame: EndFrame): { x1: number; y1: number; x2: number; y2:
     lines.push({ x1: popping[0].u, y1: popping[0].v, x2: popping[1].u, y2: popping[1].v });
   }
   return lines;
+}
+
+/** Bounce point styling: hollow = low confidence, amber ring = flagged. */
+export function pointClass(hollow: boolean, flagged: boolean): string {
+  const fill = hollow ? "fill-none" : "fill-ink";
+  if (flagged) {
+    return cn(fill, "stroke-warning");
+  }
+  return cn(fill, hollow ? "stroke-ink" : "stroke-surface");
 }
 
 export default function PitchMapSvg({
@@ -105,21 +115,24 @@ export default function PitchMapSvg({
   const flagged = new Set(flaggedBalls);
   const bowlerEndFar = frame === "batting_end";
   const offRight = offSideIsRight(frame, handedness);
-  const pitchTopLeft = {
-    u: MARGIN,
-    v: MARGIN,
-  };
+  const offLabelX = offRight ? SVG_WIDTH - MARGIN / 4 : MARGIN / 4;
 
   return (
     <svg
-      role="img"
+      role="group"
       aria-label={`pitch map, ${frame === "batting_end" ? "batting" : "bowling"} end view`}
-      width={SVG_WIDTH}
-      height={SVG_HEIGHT}
       viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
-      style={{ overflow: "visible" }}
+      className="h-auto w-full max-w-md overflow-visible"
       data-testid="pitch-map-svg"
     >
+      <rect
+        x={MARGIN}
+        y={MARGIN}
+        width={PITCH_WIDTH_PX}
+        height={PITCH_LENGTH_PX}
+        className="fill-surface"
+        pointerEvents="none"
+      />
       {LINES.flatMap((line) =>
         LENGTHS.map((length) => {
           const rect = cellRect(frame, handedness, line, length);
@@ -127,23 +140,31 @@ export default function PitchMapSvg({
           const balls = cell === undefined ? 0 : cell.balls;
           const selected =
             selectedCell !== null && selectedCell.line === line && selectedCell.length === length;
+          const shade = cellShade(length, cell, peak, colorByControl);
           return (
             <g key={`${line}-${length}`}>
               <rect
                 data-testid={`cell-${line}-${length}`}
+                data-selected={selected}
                 x={rect.u}
                 y={rect.v}
                 width={rect.w}
                 height={rect.h}
-                fill={cellFill(cell, peak, colorByControl)}
-                stroke={selected ? "#111827" : "#ffffff"}
+                fillOpacity={shade.opacity}
                 strokeWidth={selected ? 3 : 0.6}
+                className={cn(
+                  shade.className,
+                  selected ? "stroke-ink" : "stroke-surface",
+                  "cursor-pointer outline-none focus-visible:stroke-accent",
+                )}
                 tabIndex={0}
                 role="button"
+                aria-pressed={selected}
                 aria-label={`${line} ${length}: ${balls} balls`}
                 onClick={() => onSelectCell({ line, length })}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter") {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
                     onSelectCell({ line, length });
                   }
                 }}
@@ -155,7 +176,10 @@ export default function PitchMapSvg({
                 textAnchor="middle"
                 dominantBaseline="central"
                 fontSize={11}
-                fill={cellLabelColor(cell, peak, colorByControl)}
+                fontWeight={600}
+                strokeWidth={3}
+                paintOrder="stroke"
+                className="fill-ink stroke-surface"
                 pointerEvents="none"
               >
                 {balls}
@@ -166,13 +190,13 @@ export default function PitchMapSvg({
       )}
 
       <rect
-        x={pitchTopLeft.u}
-        y={pitchTopLeft.v}
+        x={MARGIN}
+        y={MARGIN}
         width={PITCH_WIDTH_PX}
         height={PITCH_LENGTH_PX}
         fill="none"
-        stroke="#111827"
         strokeWidth={1.2}
+        className="stroke-ink"
         pointerEvents="none"
       />
       {creaseLines(frame).map((line, index) => (
@@ -182,8 +206,8 @@ export default function PitchMapSvg({
           y1={line.y1}
           x2={line.x2}
           y2={line.y2}
-          stroke="#111827"
           strokeWidth={1}
+          className="stroke-ink"
           pointerEvents="none"
         />
       ))}
@@ -205,9 +229,9 @@ export default function PitchMapSvg({
               width={rect.w}
               height={rect.h}
               fill="none"
-              stroke="#dc2626"
-              strokeWidth={2}
+              strokeWidth={2.5}
               strokeDasharray="6 3"
+              className="stroke-danger"
               pointerEvents="none"
             >
               <title>{`target: ${target.description}`}</title>
@@ -220,23 +244,32 @@ export default function PitchMapSvg({
           // Never clamped and never clipped (svg overflow stays visible):
           // an off-pitch bounce renders at its true spot, like the PNG.
           const at = project(frame, point.pitch_x, point.pitch_y);
+          const isFlagged = flagged.has(point.ball_no);
           return (
             <circle
               key={`ball-${point.ball_no}`}
               data-testid={`point-${point.ball_no}`}
+              data-hollow={point.hollow}
+              data-flagged={isFlagged}
               cx={at.u}
               cy={at.v}
               r={4}
-              fill={point.hollow ? "none" : "#d62728"}
-              stroke={flagged.has(point.ball_no) ? "#f59e0b" : "#ffffff"}
-              strokeWidth={point.hollow || flagged.has(point.ball_no) ? 2 : 0.8}
+              strokeWidth={point.hollow || isFlagged ? 2 : 1}
+              className={pointClass(point.hollow, isFlagged)}
+              pointerEvents="none"
             >
               <title>{`ball ${point.ball_no} (${point.line} ${point.length}, ${point.source})`}</title>
             </circle>
           );
         })}
 
-      <text x={SVG_WIDTH / 2} y={MARGIN / 2} textAnchor="middle" fontSize={12} fill="#111827">
+      <text
+        x={SVG_WIDTH / 2}
+        y={MARGIN / 2}
+        textAnchor="middle"
+        fontSize={12}
+        className="fill-ink-muted"
+      >
         {bowlerEndFar ? "bowler end (far)" : "batter end (far)"}
       </text>
       <text
@@ -244,18 +277,18 @@ export default function PitchMapSvg({
         y={SVG_HEIGHT - MARGIN / 4}
         textAnchor="middle"
         fontSize={12}
-        fill="#111827"
+        className="fill-ink-muted"
       >
         {bowlerEndFar ? "batter end (near)" : "bowler end (near)"}
       </text>
       <text
         data-testid="off-side-label"
-        x={offRight ? SVG_WIDTH - MARGIN / 4 : MARGIN / 4}
+        x={offLabelX}
         y={SVG_HEIGHT / 2}
         textAnchor="middle"
         fontSize={11}
-        fill="#111827"
-        transform={`rotate(${offRight ? 90 : -90} ${offRight ? SVG_WIDTH - MARGIN / 4 : MARGIN / 4} ${SVG_HEIGHT / 2})`}
+        className="fill-ink-muted"
+        transform={`rotate(${offRight ? 90 : -90} ${offLabelX} ${SVG_HEIGHT / 2})`}
       >
         off side
       </text>

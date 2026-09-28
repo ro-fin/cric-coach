@@ -3,8 +3,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { BouncePoint, HeatmapCell } from "./api";
-import { cellRect, MARGIN, NO_DATA_FILL, SVG_WIDTH, viridis } from "./geometry";
-import PitchMapSvg from "./PitchMapSvg";
+import { cellRect, MARGIN, SVG_WIDTH } from "./geometry";
+import PitchMapSvg, { pointClass } from "./PitchMapSvg";
 
 const CELLS: HeatmapCell[] = [
   {
@@ -95,26 +95,30 @@ describe("cells", () => {
   it("draws all 16 zone cells shaded by density with server counts", () => {
     renderMap();
     expect(screen.getAllByRole("button")).toHaveLength(16);
-    expect(screen.getByTestId("cell-off-good")).toHaveAttribute("fill", viridis(1)); // peak cell
-    expect(screen.getByTestId("cell-middle-full")).toHaveAttribute("fill", viridis(0.5));
-    expect(screen.getByTestId("cell-leg-yorker")).toHaveAttribute("fill", viridis(0)); // no data
+    const peak = screen.getByTestId("cell-off-good");
+    expect(peak).toHaveClass("fill-zone-good");
+    expect(peak).toHaveAttribute("fill-opacity", "1"); // peak cell
+    expect(screen.getByTestId("cell-middle-full")).toHaveClass("fill-zone-full");
+    expect(screen.getByTestId("cell-middle-full")).toHaveAttribute("fill-opacity", "0.56");
+    expect(screen.getByTestId("cell-leg-yorker")).toHaveClass("fill-zone-yorker");
+    expect(screen.getByTestId("cell-leg-yorker")).toHaveAttribute("fill-opacity", "0.12");
     expect(screen.getByTestId("count-off-good")).toHaveTextContent("6");
     expect(screen.getByTestId("count-leg-yorker")).toHaveTextContent("0");
   });
 
   it("shades by control % when toggled, neutral when control is unknowable", () => {
     renderMap({ colorByControl: true });
-    expect(screen.getByTestId("cell-off-good")).toHaveAttribute("fill", viridis(0.6));
-    expect(screen.getByTestId("cell-middle-full")).toHaveAttribute("fill", NO_DATA_FILL);
-    expect(screen.getByTestId("cell-leg-yorker")).toHaveAttribute("fill", NO_DATA_FILL);
-    expect(screen.getByTestId("count-middle-full")).toHaveAttribute("fill", "#000000");
-    expect(screen.getByTestId("count-off-good")).toHaveAttribute("fill", "#000000"); // 60% > 0.5
+    expect(screen.getByTestId("cell-off-good")).toHaveClass("fill-zone-good");
+    expect(screen.getByTestId("cell-off-good")).toHaveAttribute("fill-opacity", "0.648");
+    expect(screen.getByTestId("cell-middle-full")).toHaveClass("fill-border");
+    expect(screen.getByTestId("cell-middle-full")).toHaveAttribute("fill-opacity", "1");
+    expect(screen.getByTestId("cell-leg-yorker")).toHaveClass("fill-border");
   });
 
-  it("flips count-label contrast against the density ramp", () => {
+  it("keeps count labels readable on any shade with an ink label and surface halo", () => {
     renderMap();
-    expect(screen.getByTestId("count-off-good")).toHaveAttribute("fill", "#000000"); // bright peak
-    expect(screen.getByTestId("count-leg-yorker")).toHaveAttribute("fill", "#ffffff"); // dark zero
+    expect(screen.getByTestId("count-off-good")).toHaveClass("fill-ink", "stroke-surface");
+    expect(screen.getByTestId("count-leg-yorker")).toHaveAttribute("paint-order", "stroke");
   });
 
   it("selects a cell by click and by keyboard", () => {
@@ -123,25 +127,34 @@ describe("cells", () => {
     expect(onSelectCell).toHaveBeenCalledWith({ line: "off", length: "good" });
     fireEvent.keyDown(screen.getByTestId("cell-middle-full"), { key: "Enter" });
     expect(onSelectCell).toHaveBeenCalledWith({ line: "middle", length: "full" });
+    fireEvent.keyDown(screen.getByTestId("cell-middle-full"), { key: " " });
+    expect(onSelectCell).toHaveBeenCalledTimes(3);
     fireEvent.keyDown(screen.getByTestId("cell-middle-full"), { key: "a" });
-    expect(onSelectCell).toHaveBeenCalledTimes(2);
+    expect(onSelectCell).toHaveBeenCalledTimes(3);
   });
 
   it("outlines the selected cell only", () => {
     renderMap({ selectedCell: { line: "off", length: "good" } });
-    expect(screen.getByTestId("cell-off-good")).toHaveAttribute("stroke", "#111827");
-    expect(screen.getByTestId("cell-off-full")).toHaveAttribute("stroke", "#ffffff");
-    expect(screen.getByTestId("cell-leg-good")).toHaveAttribute("stroke", "#ffffff");
+    expect(screen.getByTestId("cell-off-good")).toHaveClass("stroke-ink");
+    expect(screen.getByTestId("cell-off-good")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("cell-off-full")).toHaveClass("stroke-surface");
+    expect(screen.getByTestId("cell-leg-good")).toHaveAttribute("aria-pressed", "false");
   });
 });
 
 describe("bounce points", () => {
   it("renders provenance-honest points: solid manual, hollow low-confidence, flagged ring", () => {
     renderMap();
-    expect(screen.getByTestId("point-1")).toHaveAttribute("fill", "#d62728");
-    expect(screen.getByTestId("point-1")).toHaveAttribute("stroke", "#ffffff");
-    expect(screen.getByTestId("point-2")).toHaveAttribute("fill", "none"); // hollow
-    expect(screen.getByTestId("point-3")).toHaveAttribute("stroke", "#f59e0b"); // flagged
+    expect(screen.getByTestId("point-1")).toHaveClass("fill-ink", "stroke-surface");
+    expect(screen.getByTestId("point-2")).toHaveClass("fill-none"); // hollow
+    expect(screen.getByTestId("point-3")).toHaveClass("stroke-warning"); // flagged
+  });
+
+  it("styles every hollow/flagged combination from tokens", () => {
+    expect(pointClass(false, false)).toBe("fill-ink stroke-surface");
+    expect(pointClass(true, false)).toBe("fill-none stroke-ink");
+    expect(pointClass(false, true)).toBe("fill-ink stroke-warning");
+    expect(pointClass(true, true)).toBe("fill-none stroke-warning");
   });
 
   it("renders an off-pitch bounce at its true spot instead of clipping it (T7 lofted)", () => {
@@ -179,7 +192,7 @@ describe("frames and handedness", () => {
   it("labels the batting-end frame with the bowler end far", () => {
     renderMap();
     expect(
-      screen.getByRole("img", { name: "pitch map, batting end view" }),
+      screen.getByRole("group", { name: "pitch map, batting end view" }),
     ).toBeInTheDocument();
     expect(screen.getByText("bowler end (far)")).toBeInTheDocument();
     expect(screen.getByText("batter end (near)")).toBeInTheDocument();
@@ -188,7 +201,7 @@ describe("frames and handedness", () => {
   it("flips the end labels in the bowling-end frame", () => {
     renderMap({ frame: "bowling_end" });
     expect(
-      screen.getByRole("img", { name: "pitch map, bowling end view" }),
+      screen.getByRole("group", { name: "pitch map, bowling end view" }),
     ).toBeInTheDocument();
     expect(screen.getByText("batter end (far)")).toBeInTheDocument();
     expect(screen.getByText("bowler end (near)")).toBeInTheDocument();
