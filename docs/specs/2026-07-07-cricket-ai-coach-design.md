@@ -100,6 +100,7 @@ Decisions:
 | 5 | Coaching reports, workload safety, agents, DAG infra, observability | G1–G6, H1–H5, J1–J4, L1, L4 |
 | 6 | Leg-spin module, coach review, full dashboard, real-time hooks | I1–I7, J5, K1–K5, B5, L5 |
 | 7 | Golden scenarios, deployment (compose + LAN runbook + verified local deploy), release | T5, DoD audit |
+| 8 | Dashboard UI rebuild: design system, app shell, server-side auth proxy, test harness, missing surfaces ([plan](phase-8-plan.md)) | K1–K5, B5, dashboard halves of A4/H3/J2/L1/L3 |
 
 Branching: `phase-N-<slug>` off `main`; PR per phase (or per epic within large phases);
 merge only with CI green. Remote: private GitHub repo (child-data project ⇒ private).
@@ -129,3 +130,6 @@ merge only with CI green. Remote: private GitHub repo (child-data project ⇒ pr
 | 4 | Provider-adapter pattern for MediaPipe/YOLO/LLM with deterministic fakes | 100% coverage + testability without lab footage; real providers pluggable |
 | 5 | FT/MV-vs-real-footage ACs delivered as runbooks + recording schemas | physically impossible in software; backlog structure anticipates this |
 | 6 | docker-compose authored for LAN deploy; verified deploy on build machine is process-based | Docker daemon unavailable locally; compose validated by config lint + CI |
+| 7 | Dashboard talks to the API through a Next.js server-side proxy; role token lives in an httpOnly cookie | `NEXT_PUBLIC_API_TOKEN` was inlined into the bundle and extractable by any LAN device; proxy also removes the need for API CORS and lets one build serve all roles |
+| 8 | Tailwind v4 + in-repo accessible primitives, no component-library runtime | full control, 100% testable, small bundle for the lab tablet |
+| 9 | Windows build workspace in `C:\CricAi` with portable Node/pnpm and local caches | owner's machine; nothing installed system-wide |

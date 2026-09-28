@@ -18,6 +18,10 @@ per-ball metrics → AI coaching agents → Dashboard. The LLM never analyzes ra
 - Release checklist, hardware register & the per-story audit: [`docs/release_checklist.md`](docs/release_checklist.md) (inventory in `cricai_data.release_manifest`)
 - Deploy smoke: [`scripts/verify_deploy.py`](scripts/verify_deploy.py) · scheduled jobs: [`scripts/run_scheduled.py`](scripts/run_scheduled.py)
 
+**Dashboard UI rebuild (Phase 8, in progress):** plan, decisions and test architecture in
+[`docs/specs/phase-8-plan.md`](docs/specs/phase-8-plan.md). On the Windows build machine the
+workspace is `C:\CricAi` (see *Windows build machine* below).
+
 ## Layout
 
 ```
@@ -46,6 +50,18 @@ make seed         # generate the synthetic demo session
 Every Python package is gated at **100% line+branch coverage**; the web app is gated
 at 100% vitest coverage. The SAF (safety) suite and golden-session snapshots gate
 every release.
+
+### Windows build machine
+
+Everything lives under `C:\CricAi`: this repo in `cricAI\`, portable Node 22 and pnpm 10 in
+`tools\node\`, pnpm/npm/uv/Playwright caches in `cache\`, gate logs in `logs\`, and a live
+status board in `C:\CricAi\README.md`. `make` is not installed there, so run the Makefile's
+underlying commands after loading the environment in Git Bash:
+
+```bash
+source /c/CricAi/tools/env.sh   # PATH + caches, cd into the repo
+uv sync --all-packages && pnpm install --frozen-lockfile
+```
 
 ## Dashboard (`apps/web`)
 
