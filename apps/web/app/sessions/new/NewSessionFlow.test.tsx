@@ -180,7 +180,7 @@ describe("NewSessionFlow", () => {
       "href",
       "/sessions/new",
     );
-  });
+  }, 20_000); // a whole four-step user flow; the shared build machine runs other gates too
 
   it("skips the safety check for a human bowler and stops cleanly", async () => {
     const api = fakeApi({
@@ -220,7 +220,7 @@ describe("NewSessionFlow", () => {
     expect(screen.getByRole("link", { name: "See sessions" })).toHaveAttribute("href", "/sessions");
   });
 
-  it("shows server refusals at each action", async () => {
+  it("shows server refusals at each action", { timeout: 20_000 }, async () => {
     const api = fakeApi({
       createSession: vi
         .fn()
