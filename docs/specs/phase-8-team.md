@@ -158,6 +158,18 @@ git push origin HEAD                       # your branch
 git push origin HEAD:develop               # fast-forward only; if rejected, fetch, rebase, re-run the gate, retry
 ```
 
+**Gate amendment (T1, 19:25).** The gate also runs the dashboard copy safety test,
+which lints every string literal in `apps/web` against the banned coaching, medical and
+spin-claim phrase lists. It is a SAF test: release-gating and never waivable.
+
+```bash
+uv run pytest packages/coaching/tests/test_dashboard_copy_saf.py -q -p no:cacheprovider
+```
+
+To keep the gate short enough to win the fast-forward race, lint, test and typecheck may
+run in parallel, but `build` must start only after `typecheck` finishes: `next build`
+rewrites `.next/types`, and an overlapping `tsc` then fails with TS6053.
+
 Never force-push. Never push a red gate to `develop`. Never push to `main`. Commit
 messages end with the attribution line your session gives you. Python gates (`uv run ruff
 check .`, `uv run ruff format --check .`, `uv run mypy packages apps/api/src apps/worker/src
