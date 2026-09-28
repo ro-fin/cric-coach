@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { Badge, ErrorState, Skeleton } from "@/components/ui";
 import { createApiClient, defaultConfig } from "@/lib/api";
 import type { ApiClient, PhaseMetricsOut } from "@/lib/api";
 import { confidenceLabel, formatMetricValue } from "./metrics";
@@ -26,6 +27,7 @@ export default function BallMetricsPanel({ sessionId, ballNo, client }: BallMetr
   const api = useMemo(() => client ?? createApiClient(defaultConfig()), [client]);
   const [phases, setPhases] = useState<PhaseMetricsOut[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,25 +48,45 @@ export default function BallMetricsPanel({ sessionId, ballNo, client }: BallMetr
     return () => {
       cancelled = true;
     };
-  }, [api, sessionId, ballNo]);
+  }, [api, sessionId, ballNo, attempt]);
 
   if (error !== null) {
-    return <p data-testid="metrics-error">Metrics unavailable: {error}</p>;
+    return (
+      <div data-testid="metrics-error">
+        <ErrorState
+          message={`Metrics unavailable: ${error}`}
+          onRetry={() => setAttempt((n) => n + 1)}
+        />
+      </div>
+    );
   }
   if (phases === null) {
-    return <p data-testid="metrics-loading">Loading metrics…</p>;
+    return (
+      <div data-testid="metrics-loading">
+        <Skeleton label={`Loading metrics for ball ${ballNo}`} lines={2} />
+      </div>
+    );
   }
   if (phases.length === 0) {
-    return <p data-testid="metrics-empty">No metrics recorded for ball {ballNo}.</p>;
+    return (
+      <p data-testid="metrics-empty" className="text-ink-muted">
+        No metrics recorded for ball {ballNo}.
+      </p>
+    );
   }
   return (
-    <section aria-label={`metrics for ball ${ballNo}`}>
+    <section aria-label={`metrics for ball ${ballNo}`} className="grid gap-3 md:grid-cols-2">
       {phases.map((phase) => (
-        <article key={phase.phase}>
-          <h3>
+        <article key={phase.phase} className="rounded-xl border border-border p-4">
+          <h3 className="mb-2 font-semibold">
             {phase.phase} {phase.stored ? "(stored)" : "(synthesized from manual sources)"}
           </h3>
-          <ul>
+          {!phase.stored && (
+            <Badge tone="warning" className="mb-2">
+              not from the vision pipeline
+            </Badge>
+          )}
+          <ul className="flex flex-col gap-1 text-sm">
             {Object.keys(phase.metrics)
               .sort()
               .map((name) => {

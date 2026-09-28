@@ -16,6 +16,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { Button, EmptyState } from "@/components/ui";
 import { clipMediaUrl } from "@/lib/api";
 import { isEditableTarget } from "./keyboard";
 import {
@@ -108,58 +109,68 @@ export default function MultiCamPlayer({
   });
 
   if (active === null) {
-    return <p data-testid="player-empty">No playable clips for ball {ballNo}.</p>;
+    return (
+      <div data-testid="player-empty">
+        <EmptyState
+          title={`No playable clips for ball ${ballNo}.`}
+          description="Clips appear once the pipeline has cut them from the camera videos."
+        />
+      </div>
+    );
   }
 
   return (
-    <section aria-label={`multi-camera player for ball ${ballNo}`}>
-      <div role="group" aria-label="cameras">
-        {cameras.map((clip, index) => (
-          <button
-            key={clip.camera_id}
-            type="button"
-            aria-pressed={index === activeIdx}
-            onClick={() => switchTo(index)}
-          >
-            {clip.camera_id}
-          </button>
-        ))}
-      </div>
+    <section aria-label={`multi-camera player for ball ${ballNo}`} className="flex flex-col gap-3">
       <video
         data-testid="player-video"
         ref={videoRef}
         controls
         preload="auto"
+        className="aspect-video w-full rounded-xl bg-black"
         src={clipMediaUrl(mediaBase, active.object_key)}
         onTimeUpdate={(event) => {
           timeRef.current = event.currentTarget.currentTime;
           setTimeS(event.currentTarget.currentTime);
         }}
       />
-      <p data-testid="player-readout">
+      <div role="group" aria-label="cameras" className="flex flex-wrap gap-2">
+        {cameras.map((clip, index) => (
+          <Button
+            key={clip.camera_id}
+            variant={index === activeIdx ? "primary" : "secondary"}
+            aria-pressed={index === activeIdx}
+            onClick={() => switchTo(index)}
+          >
+            {clip.camera_id}
+          </Button>
+        ))}
+      </div>
+      <p data-testid="player-readout" className="font-mono text-sm text-ink-muted">
         {active.camera_id} · t {timeS.toFixed(3)} s · frame {frameIndex(timeS, fps)} · anchor{" "}
         {Math.round(absoluteMs(active, timeS))} ms ·{" "}
         {knownFps === null ? `assumes ${FRAME_RATE_FPS} fps` : `${knownFps} fps`}
       </p>
-      <div role="group" aria-label="frame step">
-        <button type="button" onClick={() => step(-1)}>
-          −1 frame
-        </button>
-        <button type="button" onClick={() => step(1)}>
-          +1 frame
-        </button>
-      </div>
-      <div role="group" aria-label="playback rate">
-        {PLAYBACK_RATES.map((option) => (
-          <button
-            key={option}
-            type="button"
-            aria-pressed={rate === option}
-            onClick={() => setRate(option)}
-          >
-            {option}×
-          </button>
-        ))}
+      <div className="flex flex-wrap gap-4">
+        <div role="group" aria-label="frame step" className="flex gap-2">
+          <Button variant="secondary" onClick={() => step(-1)}>
+            −1 frame
+          </Button>
+          <Button variant="secondary" onClick={() => step(1)}>
+            +1 frame
+          </Button>
+        </div>
+        <div role="group" aria-label="playback rate" className="flex gap-2">
+          {PLAYBACK_RATES.map((option) => (
+            <Button
+              key={option}
+              variant={rate === option ? "primary" : "secondary"}
+              aria-pressed={rate === option}
+              onClick={() => setRate(option)}
+            >
+              {option}×
+            </Button>
+          ))}
+        </div>
       </div>
     </section>
   );

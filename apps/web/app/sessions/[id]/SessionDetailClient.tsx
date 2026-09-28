@@ -9,12 +9,29 @@
  * across the filtered timeline. Per-camera fps is read from the session
  * videos payload when the viewer's role can see it; otherwise the player
  * assumes the US-B2 default, visibly.
+ *
+ * Tablet first, video first: the selected ball's player and metrics lead the
+ * page; below 1024px the filters and timeline follow underneath, above it
+ * they sit in a side column.
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { createApiClient, defaultConfig, defaultMediaBase } from "@/lib/api";
+import {
+  Badge,
+  Card,
+  CardBody,
+  CardHeader,
+  CardTitle,
+  DegradedBanner,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  Skeleton,
+} from "@/components/ui";
+import { ApiError, createApiClient, defaultConfig, defaultMediaBase } from "@/lib/api";
 import type { ApiClient, SessionOut } from "@/lib/api";
 import { formatBallCount } from "@/lib/format";
+import { BOWLER_LABELS, degradedReasons, stateTone } from "../list";
 import BallMetricsPanel from "./BallMetricsPanel";
 import BallTimeline from "./BallTimeline";
 import { isEditableTarget } from "./keyboard";
@@ -43,7 +60,13 @@ interface LoadedData {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  if (error instanceof ApiError && error.status === 403) {
+    return "Your role cannot see this session.";
+  }
+  if (error instanceof ApiError && error.status === 404) {
+    return "This session does not exist.";
+  }
+  return `Could not load session: ${error instanceof Error ? error.message : String(error)}`;
 }
 
 /** The ?ball=N deep link from the pitch map (US-K2), or null. */
@@ -65,6 +88,7 @@ export default function SessionDetailClient({
   const media = mediaBase ?? defaultMediaBase();
   const [data, setData] = useState<LoadedData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [filter, setFilter] = useState<TimelineFilter>(EMPTY_FILTER);
   const [selectedBallNo, setSelectedBallNo] = useState<number | null>(null);
   const [deepLinkBallNo, setDeepLinkBallNo] = useState<number | undefined>(undefined);
@@ -72,6 +96,8 @@ export default function SessionDetailClient({
 
   useEffect(() => {
     let cancelled = false;
+    setError(null);
+    setData(null);
     Promise.all([
       api.getSession(sessionId),
       api.listEvents(sessionId),
@@ -117,7 +143,7 @@ export default function SessionDetailClient({
     return () => {
       cancelled = true;
     };
-  }, [api, sessionId]);
+  }, [api, sessionId, attempt]);
 
   const rows = data === null ? [] : data.rows;
   const filtered = applyFilter(rows, filter);
@@ -139,50 +165,91 @@ export default function SessionDetailClient({
   });
 
   if (error !== null) {
-    return <p data-testid="detail-error">Could not load session: {error}</p>;
+    return (
+      <main className="mx-auto w-full max-w-7xl p-4 md:p-6">
+        <PageHeader title="Session" />
+        <div data-testid="detail-error">
+          <ErrorState message={error} onRetry={() => setAttempt((n) => n + 1)} />
+        </div>
+      </main>
+    );
   }
   if (data === null) {
-    return <p data-testid="detail-loading">Loading session…</p>;
+    return (
+      <main className="mx-auto w-full max-w-7xl p-4 md:p-6">
+        <div data-testid="detail-loading">
+          <Skeleton label="Loading session" lines={5} />
+        </div>
+      </main>
+    );
   }
 
   const { session } = data;
   const selectedRow = rows.find((row) => row.ballNo === selectedBallNo) ?? null;
 
   return (
-    <main>
-      <h1>
-        Session {session.session_date} · {session.session_type}
-      </h1>
-      <p>
-        {session.state} · {session.bowler_source} · {formatBallCount(rows.length)}
-        {session.degraded ? " · degraded capture" : ""}
-      </p>
-      <TimelineFilters filter={filter} blocks={blockOptions(rows)} onChange={setFilter} />
-      <BallTimeline
-        rows={filtered}
-        selectedBallNo={selectedBallNo}
-        onSelect={setSelectedBallNo}
-        scrollToBallNo={deepLinkBallNo}
+    <main className="mx-auto w-full max-w-7xl p-4 md:p-6">
+      <PageHeader
+        title={`Session ${session.session_date} · ${session.session_type}`}
+        description={`${session.state} · ${session.bowler_source} · ${formatBallCount(rows.length)}${
+          session.degraded ? " · degraded capture" : ""
+        }`}
+        actions={
+          <>
+            <Badge tone={stateTone(session.state)}>{session.state}</Badge>
+            <Badge tone="neutral">{BOWLER_LABELS[session.bowler_source]}</Badge>
+          </>
+        }
       />
-      {selectedRow === null ? (
-        <p data-testid="no-selection">No balls recorded for this session yet.</p>
-      ) : (
-        <section aria-label={`ball ${selectedRow.ballNo} detail`}>
-          <h2>Ball {selectedRow.ballNo}</h2>
-          <MultiCamPlayer
-            key={selectedRow.ballNo}
-            ballNo={selectedRow.ballNo}
-            cameras={playableClips(selectedRow)}
-            mediaBase={media}
-            fpsByCamera={cameraFps}
-          />
-          <BallMetricsPanel
-            sessionId={sessionId}
-            ballNo={selectedRow.ballNo}
-            client={api}
-          />
-        </section>
-      )}
+      <div className="mb-4">
+        <DegradedBanner reasons={degradedReasons(session)} />
+      </div>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <div className="flex min-w-0 flex-col gap-4">
+          {selectedRow === null ? (
+            <div data-testid="no-selection">
+              <EmptyState
+                title="No balls recorded for this session yet."
+                description="Balls appear once the pipeline has detected deliveries."
+              />
+            </div>
+          ) : (
+            <Card aria-labelledby="selected-ball-heading">
+              <CardHeader>
+                <CardTitle id="selected-ball-heading">Ball {selectedRow.ballNo}</CardTitle>
+                <p className="text-sm text-ink-muted" aria-hidden="true">
+                  ↑/↓ ball · ←/→ frame · 1–8 camera
+                </p>
+              </CardHeader>
+              <CardBody className="flex flex-col gap-4">
+                <MultiCamPlayer
+                  key={selectedRow.ballNo}
+                  ballNo={selectedRow.ballNo}
+                  cameras={playableClips(selectedRow)}
+                  mediaBase={media}
+                  fpsByCamera={cameraFps}
+                />
+                <BallMetricsPanel
+                  sessionId={sessionId}
+                  ballNo={selectedRow.ballNo}
+                  client={api}
+                />
+              </CardBody>
+            </Card>
+          )}
+        </div>
+        <Card aria-label="Balls" className="min-w-0">
+          <CardBody className="flex flex-col gap-4">
+            <TimelineFilters filter={filter} blocks={blockOptions(rows)} onChange={setFilter} />
+            <BallTimeline
+              rows={filtered}
+              selectedBallNo={selectedBallNo}
+              onSelect={setSelectedBallNo}
+              scrollToBallNo={deepLinkBallNo}
+            />
+          </CardBody>
+        </Card>
+      </div>
     </main>
   );
 }

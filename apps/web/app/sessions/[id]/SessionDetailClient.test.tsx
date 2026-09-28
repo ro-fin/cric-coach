@@ -168,11 +168,13 @@ describe("SessionDetailClient (US-K1, US-B5)", () => {
   it("steps balls with ↑/↓ across the timeline, clamped at the ends", async () => {
     renderDetail();
     await detailLoaded();
+    // wait for the selection and the settled keyboard listener before stepping
+    await screen.findByRole("heading", { name: "Ball 1" });
     fireEvent.keyDown(document.body, { key: "ArrowDown" });
-    expect(screen.getByRole("heading", { name: "Ball 2" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Ball 2" })).toBeInTheDocument();
     fireEvent.keyDown(document.body, { key: "ArrowUp" });
     fireEvent.keyDown(document.body, { key: "ArrowUp" }); // clamped at ball 1
-    expect(screen.getByRole("heading", { name: "Ball 1" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Ball 1" })).toBeInTheDocument();
     fireEvent.keyDown(document.body, { key: "Enter" }); // unbound key
     expect(screen.getByRole("heading", { name: "Ball 1" })).toBeInTheDocument();
   });

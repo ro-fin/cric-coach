@@ -6,6 +6,7 @@
  * block numbers actually present in this session's tags.
  */
 
+import { Button } from "@/components/ui";
 import {
   EMPTY_FILTER,
   LENGTH_OPTIONS,
@@ -15,6 +16,10 @@ import {
   isFilterActive,
 } from "./timeline";
 import type { TimelineFilter } from "./timeline";
+
+const FIELD =
+  "min-h-11 w-full rounded-lg border-2 border-border bg-surface px-2 text-ink focus:border-accent";
+const LABEL = "flex flex-col gap-1 text-sm font-semibold";
 
 export interface TimelineFiltersProps {
   filter: TimelineFilter;
@@ -41,11 +46,12 @@ export default function TimelineFilters({ filter, blocks, onChange }: TimelineFi
   }
 
   return (
-    <fieldset data-testid="timeline-filters">
-      <legend>Filters</legend>
-      <label>
+    <fieldset data-testid="timeline-filters" className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <legend className="mb-2 text-lg font-semibold">Filters</legend>
+      <label className={LABEL}>
         Block
         <select
+          className={FIELD}
           value={filter.block === null ? "" : String(filter.block)}
           onChange={(event) =>
             set({ block: event.target.value === "" ? null : Number(event.target.value) })
@@ -60,9 +66,10 @@ export default function TimelineFilters({ filter, blocks, onChange }: TimelineFi
         </select>
       </label>
       {SELECTS.map(({ key, label, options }) => (
-        <label key={key}>
+        <label key={key} className={LABEL}>
           {label}
           <select
+            className={FIELD}
             value={filter[key] ?? ""}
             onChange={(event) =>
               set({
@@ -79,9 +86,10 @@ export default function TimelineFilters({ filter, blocks, onChange }: TimelineFi
           </select>
         </label>
       ))}
-      <label>
+      <label className={LABEL}>
         Control
         <select
+          className={FIELD}
           value={filter.control === null ? "" : String(filter.control)}
           onChange={(event) =>
             set({ control: event.target.value === "" ? null : event.target.value === "true" })
@@ -92,9 +100,14 @@ export default function TimelineFilters({ filter, blocks, onChange }: TimelineFi
           <option value="false">uncontrolled</option>
         </select>
       </label>
-      <button type="button" disabled={!isFilterActive(filter)} onClick={() => onChange(EMPTY_FILTER)}>
+      <Button
+        variant="ghost"
+        className="self-end"
+        disabled={!isFilterActive(filter)}
+        onClick={() => onChange(EMPTY_FILTER)}
+      >
         Clear filters
-      </button>
+      </Button>
     </fieldset>
   );
 }

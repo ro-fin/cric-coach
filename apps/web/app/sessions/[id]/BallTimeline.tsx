@@ -13,11 +13,21 @@
 import { useEffect, useRef, useState } from "react";
 import type { UIEvent } from "react";
 import { chipSummary, chipTone, windowSlice } from "./timeline";
-import type { BallRow } from "./timeline";
+import type { BallRow, ChipTone } from "./timeline";
 
-export const ROW_PX = 40;
+/** Row pitch: a 44px tap target plus a 4px gap. */
+export const ROW_PX = 48;
 export const OVERSCAN = 5;
 export const DEFAULT_VIEWPORT_PX = 480;
+
+/** Chip edge colour per outcome tone (tokens only). */
+const TONE_BORDER: Record<ChipTone, string> = {
+  good: "border-l-success",
+  mixed: "border-l-warning",
+  bad: "border-l-danger",
+  neutral: "border-l-info",
+  untagged: "border-l-border",
+};
 
 export interface BallTimelineProps {
   rows: BallRow[];
@@ -62,7 +72,14 @@ export default function BallTimeline({
   }
 
   if (rows.length === 0) {
-    return <p data-testid="timeline-empty">No balls match the current filters.</p>;
+    return (
+      <p
+        data-testid="timeline-empty"
+        className="rounded-xl border-2 border-dashed border-border p-4 text-ink-muted"
+      >
+        No balls match the current filters.
+      </p>
+    );
   }
 
   return (
@@ -71,6 +88,7 @@ export default function BallTimeline({
       data-testid="timeline-scroll"
       onScroll={handleScroll}
       style={{ height: viewportPx, overflowY: "auto" }}
+      className="rounded-lg"
     >
       <ul aria-label="ball timeline" style={{ listStyle: "none", margin: 0, padding: 0 }}>
         <li aria-hidden="true" style={{ height: slice.padTopPx }} />
@@ -81,14 +99,24 @@ export default function BallTimeline({
               data-tone={chipTone(row)}
               aria-pressed={row.ballNo === selectedBallNo}
               onClick={() => onSelect(row.ballNo)}
+              className={`flex h-11 w-full items-center gap-2 overflow-hidden rounded-lg border border-l-4 border-border px-3 text-left text-sm whitespace-nowrap ${
+                TONE_BORDER[chipTone(row)]
+              } ${
+                row.ballNo === selectedBallNo
+                  ? "bg-surface-raised font-semibold ring-2 ring-accent"
+                  : "bg-surface hover:bg-surface-raised"
+              }`}
             >
-              <span>Ball {row.ballNo}</span> <span>{chipSummary(row)}</span>{" "}
-              <span>
+              <span className="font-semibold">Ball {row.ballNo}</span>{" "}
+              <span className="truncate">{chipSummary(row)}</span>{" "}
+              <span className="text-ink-muted">
                 {row.event === null
                   ? "no event"
                   : `event ${row.event.source} · conf ${row.event.confidence.toFixed(2)}`}
               </span>{" "}
-              <span>{row.clips.length === 0 ? "no clips" : `${row.clips.length} clips`}</span>
+              <span className="text-ink-muted">
+                {row.clips.length === 0 ? "no clips" : `${row.clips.length} clips`}
+              </span>
             </button>
           </li>
         ))}
