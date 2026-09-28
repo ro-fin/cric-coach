@@ -21,6 +21,8 @@ make web-lint web-test web-build  # pnpm lint/typecheck, vitest 100%, next build
 make test-integration             # real temp PostgreSQL 16 + redis + ffmpeg
 make safety                       # SAF suite — release-gating, never waivable
 make golden                       # golden demo digest + T5 golden scenarios
+make contract                     # Phase 8: checked-in OpenAPI dump is current (web contract test pins to it)
+make web-e2e                      # Phase 8: Playwright UAT journeys, tablet + desktop, production build
 ```
 
 - [ ] All of the above green at the release commit
@@ -29,6 +31,8 @@ make golden                       # golden demo digest + T5 golden scenarios
       intentionally in the same commit (DoD: golden fixtures updated intentionally)
 - [ ] `scripts/verify_deploy.py` exits 0 against the deployed stack
 - [ ] UAT scripts executed and logged (`docs/uat_scripts.md` results table)
+- [ ] `make web-e2e` green at the release commit (26 journeys: sign-in, UAT-P1, UAT-P2,
+      UAT-PA degraded session, UAT-C2 review queue; `apps/web/e2e`)
 
 **Two honest caveats about what the gates do and do not cover:**
 
@@ -38,6 +42,10 @@ make golden                       # golden demo digest + T5 golden scenarios
   98% by its unit tests) and `scripts/run_scheduled.py` have real but **unenforced**
   coverage — a new untested smoke leg or option would not fail any gate. mypy
   strict does still typecheck `scripts/`.
+- **`make web-e2e` exercises the dev stack, not the deployed stack.** The journeys run
+  the real API code on in-memory SQLite with the seeded demo and a production build of
+  the dashboard; PostgreSQL, Redis, media serving and the LAN proxy configuration are
+  still only covered by `scripts/verify_deploy.py` and the hand-run UAT.
 - **The live process-stack deploy is never machine-executed.** No gate, Makefile
   target, or CI step runs `scripts/deploy_local.sh` or boots a live stack;
   `test_verify_deploy.py` is unit-only (in-process `TestClient` + mocked web leg)
@@ -140,7 +148,31 @@ the register in §3. Story-level residues are flagged inline (and in the manifes
   voice-note capture/transcription never shipped. Tests: `apps/web` vitest at 100%
   thresholds (`pnpm test`), `apps/api/tests/test_notes_api.py`.
 - Note: the backlog's Playwright ST flows ride the T5 goldens + vitest component
-  tests; no separate Playwright suite ships (phase-6 decision).
+  tests; no separate Playwright suite shipped in Phase 6. **Phase 8 ships one**
+  (`apps/web/e2e`, `make web-e2e`): the UAT-P1/P2/PA/C2 journeys run in Chromium on a
+  tablet and a desktop viewport against the real API (in-memory SQLite, seeded demo)
+  and a production build of the dashboard. It is a release gate here; in CI it is a
+  separate job, not yet branch protection.
+
+### Phase 8 — Dashboard UI rebuild (Epic K re-delivered, product-grade)
+- Plan and decisions: `docs/specs/phase-8-plan.md`; team protocol and status:
+  `docs/specs/phase-8-team.md`, `docs/specs/phase-8-status/`.
+- Auth: the API token no longer ships in the JS bundle. `/login` (role + token) sets an
+  httpOnly `cricai_session` cookie; `app/api/cricai/[...path]` proxies to
+  `CRICAI_API_BASE_URL` server-side. `NEXT_PUBLIC_API_TOKEN` is gone; one build serves
+  every role. Tests: `apps/web/app/api`, `apps/web/app/login`, `apps/web/lib/auth`,
+  e2e `auth.spec.ts` (cookie httpOnly, token never in browser JavaScript).
+- Design system: Tailwind v4 tokens (light/dark/print), `components/ui` primitives,
+  `components/shell` (sidebar >= 1024px, tab bar below), PWA manifest, standalone image.
+- Screens: Today, sessions list/detail/new, reports index + net-wall print, review, notes,
+  pitch map, progress, pipeline, wellness, alerts, cameras, settings. Every data component
+  shows loading/empty/error/forbidden honestly (`test/states.ts` sweeps).
+- Contract: `apps/web/test/contract.test.ts` pins every `lib/api.ts` enum and response
+  mirror to `apps/web/test/openapi.json` (`scripts/dump_openapi.py`, `make contract`).
+- Data parity unchanged: the dashboard renders API values only. Backend untouched
+  (`packages/`, `apps/api/src`, `apps/worker` identical to the Phase 7 release).
+- Dev: `make dev` boots the real API on SQLite with a seeded, gate-published demo
+  (`scripts/dev_stack.py`, `apps/api/tests/test_dev_stack.py`).
 
 ### Epic L — Platform & Non-Functional
 - Stories: L1, L3, L4 shipped; **L2 shipped-partial** — gates complete and enforced

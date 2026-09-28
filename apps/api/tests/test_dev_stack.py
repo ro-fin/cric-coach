@@ -8,6 +8,7 @@ the seeded app through the API only, as the dashboard does.
 """
 
 import importlib.util
+import socket
 import sys
 from pathlib import Path
 
@@ -173,3 +174,12 @@ def test_web_commands_for_each_mode() -> None:
     ]
     with pytest.raises(ValueError, match="unknown web mode"):
         dev_stack.web_commands("pnpm", "staging", "h", 1)
+
+
+def test_port_in_use_detects_a_listener() -> None:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+        server.bind(("127.0.0.1", 0))
+        server.listen(1)
+        _host, port = server.getsockname()
+        assert dev_stack.port_in_use("127.0.0.1", port) is True
+    assert dev_stack.port_in_use("127.0.0.1", port) is False

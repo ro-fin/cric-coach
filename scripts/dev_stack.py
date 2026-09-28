@@ -37,6 +37,7 @@ import argparse
 import os
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import tempfile
@@ -395,6 +396,18 @@ def web_env(api_base: str, base: dict[str, str] | None = None) -> dict[str, str]
     return env
 
 
+def port_in_use(host: str, port: int) -> bool:
+    """True when something already listens on host:port.
+
+    uvicorn only logs a bind failure and the script would carry on with a dead
+    API (a leftover stack from an interrupted run did exactly that); the stack
+    refuses to start instead, so Playwright fails fast with a readable reason.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.settimeout(0.2)
+        return probe.connect_ex((host, port)) == 0
+
+
 def web_commands(pnpm: str, mode: str, host: str, port: int) -> list[list[str]]:
     """The commands that serve the dashboard: `next dev`, or a production build + `next start`.
 
@@ -449,6 +462,18 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - process or
         help="dev: next dev (hot reload); prod: next build then next start",
     )
     args = parser.parse_args(argv)
+
+    busy = [
+        f"{args.host}:{port}"
+        for port in ([args.api_port] if args.api_only else [args.api_port, args.web_port])
+        if port_in_use(args.host, port)
+    ]
+    if busy:
+        print(
+            f"port already in use: {', '.join(busy)} (a previous stack still running?)",
+            file=sys.stderr,
+        )
+        return 2
 
     storage = Path(tempfile.mkdtemp(prefix="cricai-dev-"))
     app = make_app(storage, make_engine())

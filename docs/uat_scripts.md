@@ -24,8 +24,13 @@ up preconditions, marked *Setup*, but must not steer during the task).
 
 ## Player script (UAT-P)
 
-Persona: the 11-year-old. Device: the lab tablet/laptop, Player token configured
-(`NEXT_PUBLIC_API_TOKEN`, `apps/web/lib/api.ts`).
+Persona: the 11-year-old. Device: the lab tablet/laptop, signed in at `WEB/login` as
+**Player** with the Player token (Phase 8: the token lives in an httpOnly cookie on the
+device, never in the page; `NEXT_PUBLIC_API_TOKEN` no longer exists).
+
+Automated twin: UAT-P1, UAT-P2, the UAT-PA degraded-session check and UAT-C2 also run
+in Chromium on a tablet and a desktop viewport (`make web-e2e`, `apps/web/e2e`) against
+the seeded demo lab. The scripts below stay the human pass on real footage.
 
 ### UAT-P1 — Find your best cover drive (US-B5 / US-K1)
 
@@ -46,10 +51,9 @@ UAT AC), in under 2 minutes.
 
 ### UAT-P2 — Read today's report aloud (US-G3 / US-K5)
 
-*Setup:* facilitator opens the day's PUBLISHED report at
-`WEB/reports?report_id=<id>` (id from `GET API/reports?player_id=<player>&kind=daily`;
-the report page takes the id as a query parameter — there is no report-list UI, see
-Gaps below).
+*Setup:* the player opens **Today** (`WEB/`), which shows the day's PUBLISHED report,
+or `WEB/reports` and picks it from the list (Phase 8; newest first, kind filter).
+Drafts held by the review gate are never shown to the Player role.
 
 1. Player reads the whole report aloud from `ReportView`: the positive, the ONE
    correction, the drill, the measurable goal, and any honesty banner.
@@ -307,11 +311,12 @@ These are the places where a T6 task needs facilitator setup because a UI surfac
 does not exist; they are recorded in the release inventory
 (`cricai_data.release_manifest`) and the release checklist:
 
-- **No report-list / report-picker UI**: `WEB/reports` requires `?report_id=`;
-  the id comes from `GET API/reports?player_id=…` (UAT-P2/P5 setup step).
-- **No session-creation or upload UI**: UAT-PA2 is deliberately `curl`-based —
-  the operator surface is the API, and the exact request bodies are inline in the
-  UAT-PA2 step above (US-B1/B2 shipped as API).
+- ~~No report-list UI~~ **closed in Phase 8**: `WEB/reports` lists the player's reports
+  (reviewers also see drafts and blocked); `?report_id=` still opens one directly.
+- **Uploads are still API-only**: Phase 8 added `WEB/sessions/new` (create → cameras →
+  machine safety checklist → start/stop, resumable after a tablet reload), but the
+  per-camera video upload (US-B2 multipart) has no UI yet, so UAT-PA2 steps 5–8 stay
+  `curl`-based with the request bodies inline above.
 - **Event corrections have no drag UI** (US-D4 residue): correction UAT is not in
   this release's scripts; corrections run through `API/sessions/{id}/events/*`.
 - **A gate-BLOCKED report leaves the web review queue** (the queue lists DRAFT

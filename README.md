@@ -69,40 +69,43 @@ uv sync --all-packages && pnpm install --frozen-lockfile
 ## Dashboard (`apps/web`)
 
 Next.js app rendering ONLY what the API returns (US-K4 data-parity — no
-client-side metric computation). Routes:
+client-side metric computation). Phase 8 rebuilt it on a design system (Tailwind
+tokens, light/dark/print, tablet-first shell) and moved sign-in server-side. Routes:
 
-| Route | View |
-|---|---|
-| `/` | home |
-| `/sessions`, `/sessions/[id]` | session list; ball-by-ball timeline + multi-cam clip player (US-K1) |
-| `/pitchmap/[sessionId]` | pitch map + zone analytics (US-K2) |
-| `/notes` | coach notes panel (US-K3) |
-| `/reports` | session/weekly/monthly report surface + PDF/PNG export (US-K5) |
-| `/progress` | trends, milestones, workload (US-K4/G5) |
-| `/review` | coach review queue: publish/block gate-held drafts (US-J5) |
+| Route | View | Roles |
+|---|---|---|
+| `/login` | choose a role and enter its token; sets the httpOnly session cookie | public |
+| `/` | Today: the published daily report (one correction, drill, goal) and workload | all |
+| `/sessions`, `/sessions/[id]`, `/sessions/new` | session list; ball-by-ball timeline + multi-cam player (US-K1); guided create → cameras → checklist → start/stop | all; `new` parent, coach |
+| `/pitchmap/[sessionId]` | pitch map + zone analytics (US-K2) | all |
+| `/progress` | trends, milestones, workload (US-K4/G5) | all |
+| `/reports` | report list, report view, PDF/PNG export, net-wall print (US-K5) | all |
+| `/wellness` | wellness check-in and history (US-H3) | all |
+| `/review` | coach review queue: publish gate-held drafts (US-J5) | coach |
+| `/notes` | coach notes panel (US-K3) | coach, parent |
+| `/pipeline` | pipeline runs and stage traces (US-L1) | parent, coach |
+| `/alerts` | alerts inbox (US-J2) | parent, coach |
+| `/cameras`, `/settings` | camera registry and health checks; versioned settings | parent |
 
-Configuration is exactly **two** environment variables — where the API is and
-which bearer token to send:
+**Configuration (Phase 8).** The browser never holds an API token. Pages call the
+same-origin proxy `/api/cricai/*`, which forwards to the API server-side with the
+bearer from the `cricai_session` cookie set at `/login`. One build serves every role.
 
 ```bash
-NEXT_PUBLIC_API_BASE_URL=http://<api-host>:8000   # default http://localhost:8000
-NEXT_PUBLIC_API_TOKEN=<role-token>                # parent/coach/player token
+CRICAI_API_BASE_URL=http://<api-host>:8000            # server-only, read at runtime
+NEXT_PUBLIC_CRICAI_MEDIA_BASE=http://<store>:9000/cricai   # clip media, inlined at build
 ```
-
-Clip playback can additionally override the object-store base with
-`NEXT_PUBLIC_CRICAI_MEDIA_BASE` (defaults to the local MinIO).
 
 ```bash
-cd apps/web
-pnpm dev     # local development against a running API
-pnpm build   # production build (then: pnpm start)
+make dev                  # seeded in-memory API + dashboard (scripts/dev_stack.py)
+cd apps/web && pnpm dev   # dashboard alone against a running API
+pnpm build && pnpm start  # production build (what the lab tablet is served)
 ```
 
-**LAN deploy note (US-L3, local-first):** `NEXT_PUBLIC_*` values are inlined
-at **build time** — set both variables before `pnpm build`, pointing at the
-LAN address of the API box (not localhost) so other devices on the LAN can
-use the dashboard. Never expose the API or the dashboard beyond the LAN — no
-raw video or report data leaves the lab.
+**LAN deploy note (US-L3, local-first):** only `NEXT_PUBLIC_CRICAI_MEDIA_BASE` is
+inlined at build time; point it at the LAN address of the store, not localhost.
+Never expose the API or the dashboard beyond the LAN — no raw video or report
+data leaves the lab.
 
 For the full deployment — the verified process-based path
 (`scripts/deploy_local.sh`), the post-deploy smoke (`scripts/verify_deploy.py`),
