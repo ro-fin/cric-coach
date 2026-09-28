@@ -161,12 +161,16 @@
 }
 
 /*
- * Print (net-wall report and any page printed from the lab tablet): black on
- * white, no app chrome, cards kept whole across page breaks.
+ * Print (net-wall report and any page printed from the lab tablet): the light
+ * palette on white paper whatever theme the screen was in, no app chrome, no
+ * screen spacing, and small blocks kept whole across page breaks. Page-specific
+ * print modes (e.g. the reports net-wall sheet) layer on top of this.
  */
 @media print {
+  /* Every selector that sets dark tokens on screen, so print always wins. */
   :root,
-  :root[data-theme="dark"] {
+  :root[data-theme],
+  :root:not([data-theme="light"]) {
     color-scheme: light;
     --bg: #ffffff;
     --surface: #ffffff;
@@ -174,8 +178,20 @@
     --border: #999999;
     --ink: #000000;
     --ink-muted: #333333;
-    --accent: #000000;
+    --accent: #0f6b45;
     --accent-ink: #ffffff;
+    --success: #11734b;
+    --warning: #8a5a00;
+    --danger: #b42318;
+    --info: #1d5fa8;
+    --zone-yorker: #7c3aed;
+    --zone-full: #0e7490;
+    --zone-good: #15803d;
+    --zone-short: #b45309;
+    --line-outside-off: #9d174d;
+    --line-off: #c2410c;
+    --line-middle: #1d4ed8;
+    --line-leg: #0f766e;
   }
 
   @page {
@@ -199,10 +215,27 @@
     display: block !important;
   }
 
+  /* The app shell's screen layout: no full-height frame, no tab-bar padding,
+     no centred max width, so a one-page sheet stays one page. */
+  .min-h-screen {
+    min-height: 0 !important;
+  }
+
+  #content {
+    padding: 0 !important;
+  }
+
+  #content > div,
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  /* Keep small blocks whole. Whole sections and tables may be longer than a
+     page, so they break normally (rows never split). */
   [data-print="keep"],
-  section,
   figure,
-  table,
   tr,
   svg {
     break-inside: avoid;
@@ -214,13 +247,12 @@
     break-after: avoid;
   }
 
-  main {
-    margin: 0 !important;
-    padding: 0 !important;
-    max-width: none !important;
+  thead {
+    display: table-header-group;
   }
 
-  a[href^="http"]::after {
+  /* External link targets on paper; not on the one-page net-wall sheet. */
+  html:not([data-print-mode="wall"]) a[href^="http"]::after {
     content: " (" attr(href) ")";
     font-size: 0.8em;
   }
