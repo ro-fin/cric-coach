@@ -15,11 +15,12 @@
  *   (routers/lifecycle.py).
  *
  * The server decides every verdict (warnings, degraded, missing_views); this
- * module only carries them. Error details are kept verbatim, including the
- * structured 422 bodies (`message` plus the offending ids).
+ * module only carries them. Calls go through lib/api `apiRequest`, whose
+ * ApiError keeps the server detail verbatim, including the structured 422
+ * bodies (`message` plus the offending ids).
  */
 
-import { ApiError, defaultConfig } from "@/lib/api";
+import { apiRequest, defaultConfig } from "@/lib/api";
 import type {
   ApiConfig,
   BowlerSource,
@@ -128,70 +129,20 @@ export interface NewSessionApi {
   lifecycle(sessionId: string): Promise<LifecycleOut>;
 }
 
-/** The server's `detail` as readable text: a string verbatim, or a structured
- * body's `message` followed by each offending list (`unknown_cameras: C9`). */
-export function detailText(body: unknown, fallback: string): string {
-  if (typeof body !== "object" || body === null || !("detail" in body)) {
-    return fallback;
-  }
-  const detail = (body as { detail: unknown }).detail;
-  if (typeof detail === "string") {
-    return detail;
-  }
-  if (typeof detail === "object" && detail !== null && !Array.isArray(detail)) {
-    const parts: string[] = [];
-    for (const [key, value] of Object.entries(detail)) {
-      if (key === "message" && typeof value === "string") {
-        parts.unshift(value);
-      } else if (Array.isArray(value) && value.length > 0) {
-        parts.push(`${key}: ${value.join(", ")}`);
-      }
-    }
-    return parts.length > 0 ? parts.join(" — ") : fallback;
-  }
-  return fallback;
-}
-
-async function send<T>(
-  config: ApiConfig,
-  method: "GET" | "POST",
-  path: string,
-  body?: unknown,
-): Promise<T> {
-  const fetchFn = config.fetchFn ?? fetch;
-  const headers: Record<string, string> = {};
-  if (config.token) headers.Authorization = `Bearer ${config.token}`;
-  if (body !== undefined) headers["Content-Type"] = "application/json";
-  const response = await fetchFn(`${config.baseUrl.replace(/\/$/, "")}${path}`, {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  if (!response.ok) {
-    let parsed: unknown = undefined;
-    try {
-      parsed = await response.json();
-    } catch {
-      // non-JSON error body: fall back to the status text
-    }
-    throw new ApiError(response.status, detailText(parsed, response.statusText));
-  }
-  return (await response.json()) as T;
-}
-
 export function createNewSessionApi(config: ApiConfig = defaultConfig()): NewSessionApi {
   const id = (sessionId: string) => encodeURIComponent(sessionId);
+  const get = <T>(path: string) => apiRequest<T>(path, {}, config);
+  const post = <T>(path: string, body: unknown) =>
+    apiRequest<T>(path, { method: "POST", body }, config);
   return {
-    listPlayers: () => send(config, "GET", "/players"),
-    createSession: (payload) => send(config, "POST", "/sessions", payload),
-    getSession: (sessionId) => send(config, "GET", `/sessions/${id(sessionId)}`),
-    machineChecklist: () => send(config, "GET", "/checklists/machine"),
-    ackChecklist: (sessionId, payload) =>
-      send(config, "POST", `/sessions/${id(sessionId)}/checklist-ack`, payload),
-    listCameras: () => send(config, "GET", "/cameras"),
-    start: (sessionId, cameras) =>
-      send(config, "POST", `/sessions/${id(sessionId)}/start`, { cameras }),
-    stop: (sessionId, payload) => send(config, "POST", `/sessions/${id(sessionId)}/stop`, payload),
-    lifecycle: (sessionId) => send(config, "GET", `/sessions/${id(sessionId)}/lifecycle`),
+    listPlayers: () => get("/players"),
+    createSession: (payload) => post("/sessions", payload),
+    getSession: (sessionId) => get(`/sessions/${id(sessionId)}`),
+    machineChecklist: () => get("/checklists/machine"),
+    ackChecklist: (sessionId, payload) => post(`/sessions/${id(sessionId)}/checklist-ack`, payload),
+    listCameras: () => get("/cameras"),
+    start: (sessionId, cameras) => post(`/sessions/${id(sessionId)}/start`, { cameras }),
+    stop: (sessionId, payload) => post(`/sessions/${id(sessionId)}/stop`, payload),
+    lifecycle: (sessionId) => get(`/sessions/${id(sessionId)}/lifecycle`),
   };
 }
