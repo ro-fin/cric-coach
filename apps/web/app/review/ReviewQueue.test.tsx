@@ -5,6 +5,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PublishOut, ReviewQueueItemOut } from "@/lib/api";
+import { expectNoA11yViolations } from "@/test/axe";
 import ReviewQueue from "./ReviewQueue";
 
 vi.mock("@/lib/api", async (importOriginal) => {
@@ -45,7 +46,7 @@ describe("ReviewQueue", () => {
       item({ id: "r2", kind: "weekly", period_start: "2026-07-03", review_due_at: null }),
     ]);
     render(<ReviewQueue />);
-    expect(screen.getByText("Loading the review queue…")).toBeInTheDocument();
+    expect(screen.getByText("Loading the review queue")).toBeInTheDocument();
     const items = await screen.findAllByTestId("review-item");
     expect(items).toHaveLength(2);
     expect(items[0]).toHaveTextContent("daily report · 2026-07-09 to 2026-07-09");
@@ -72,7 +73,11 @@ describe("ReviewQueue", () => {
       listMock.mockRejectedValue(new ApiError(status, "nope"));
       render(<ReviewQueue />);
       const gate = await screen.findByTestId("review-forbidden");
-      expect(gate).toHaveTextContent("coach surface");
+      expect(gate).toHaveTextContent("for coaches");
+      expect(screen.getByRole("link", { name: "Sign in as coach" })).toHaveAttribute(
+        "href",
+        "/login?next=%2Freview",
+      );
       expect(gate).toHaveTextContent(`HTTP ${status}`);
     },
   );
@@ -92,6 +97,22 @@ describe("ReviewQueue", () => {
     expect(await screen.findByTestId("review-error")).toHaveTextContent(
       "Could not reach the lab server for the review queue.",
     );
+  });
+
+  it("retries a failed load", async () => {
+    listMock.mockRejectedValueOnce(new Error("wire down"));
+    listMock.mockResolvedValue([]);
+    render(<ReviewQueue />);
+    fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+    expect(await screen.findByTestId("review-empty")).toHaveTextContent(
+      "no draft reports are waiting",
+    );
+  });
+
+  it("is axe clean with items", async () => {
+    const { container } = render(<ReviewQueue />);
+    await screen.findAllByTestId("review-item");
+    await expectNoA11yViolations(container);
   });
 
   it("publishes an item, confirms, re-fetches the queue and disables a second click", async () => {

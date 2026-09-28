@@ -29,8 +29,19 @@
  * authenticate from a bare anchor (the ExportButtons precedent).
  */
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
+import {
+  Badge,
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  CardTitle,
+  EmptyState,
+  ErrorState,
+  LinkButton,
+  Skeleton,
+} from "@/components/ui";
 import {
   ApiError,
   listReviewQueue,
@@ -74,9 +85,11 @@ export default function ReviewQueue() {
   // Items this coach decided that the server no longer lists (a decided
   // report exits DRAFT): kept on screen with the decision that explains why.
   const [departed, setDeparted] = useState<ReviewQueueItemOut[]>([]);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    setState({ kind: "loading" });
     listReviewQueue()
       .then((items) => {
         if (!cancelled) setState({ kind: "loaded", items });
@@ -92,7 +105,7 @@ export default function ReviewQueue() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
   async function publish(item: ReviewQueueItemOut): Promise<void> {
     setDecisions((prev) => ({ ...prev, [item.id]: { kind: "pending" } }));
@@ -123,21 +136,27 @@ export default function ReviewQueue() {
   }
 
   if (state.kind === "loading") {
-    return <p aria-busy="true">Loading the review queue…</p>;
+    return <Skeleton label="Loading the review queue" lines={4} />;
   }
   if (state.kind === "forbidden") {
     return (
-      <p role="alert" data-testid="review-forbidden">
-        The review queue is a coach surface (US-J5). This device&apos;s token was refused (HTTP{" "}
-        {state.status}) — configure the coach bearer token to review held reports.
-      </p>
+      <div data-testid="review-forbidden" className="flex flex-col gap-3">
+        <ErrorState
+          message={`The review queue is for coaches (US-J5). This sign-in was refused (HTTP ${state.status}) — sign in as the coach to review held reports.`}
+        />
+        <div>
+          <LinkButton variant="secondary" href="/login?next=%2Freview">
+            Sign in as coach
+          </LinkButton>
+        </div>
+      </div>
     );
   }
   if (state.kind === "error") {
     return (
-      <p role="alert" data-testid="review-error">
-        {state.message}
-      </p>
+      <div data-testid="review-error">
+        <ErrorState message={state.message} onRetry={() => setAttempt((n) => n + 1)} />
+      </div>
     );
   }
   const listed = new Set(state.items.map((entry) => entry.id));
@@ -149,55 +168,80 @@ export default function ReviewQueue() {
   ];
   if (rows.length === 0) {
     return (
-      <p data-testid="review-empty">The review queue is clear — no draft reports are waiting.</p>
+      <div data-testid="review-empty">
+        <EmptyState
+          title="The review queue is clear"
+          description="The review queue is clear — no draft reports are waiting."
+        />
+      </div>
     );
   }
   return (
-    <ul data-testid="review-items">
+    <ul data-testid="review-items" aria-label="Reports awaiting review" className="flex flex-col gap-4">
       {rows.map(({ item, isDeparted }) => {
         const decision = decisions[item.id];
         const pending = decision !== undefined && decision.kind === "pending";
         const decided = decision !== undefined && decision.kind === "decided";
         const published = decided && decision.outcome.status === "published";
+        const titleId = `review-${item.id}`;
         return (
           <li key={item.id} data-testid="review-item">
-            <p>
-              <strong>{item.kind}</strong> report · {item.period_start} to {item.period_end} ·
-              review due {item.review_due_at ?? "—"}
-            </p>
-            {isDeparted && (
-              <p data-testid="review-departed">
-                No longer in the review queue — the publish decision below is why.
-              </p>
-            )}
-            <p>
-              <Link href={`/reports?report_id=${item.id}`}>View report</Link>{" "}
-              <button
-                type="button"
-                disabled={pending || published}
-                onClick={() => void publish(item)}
-              >
-                Publish
-              </button>
-            </p>
-            {decision !== undefined && decision.kind === "failed" && (
-              <p role="alert" data-testid="publish-error">
-                {decision.message}
-              </p>
-            )}
-            {published && (
-              <p data-testid="publish-published">Published — the report is live.</p>
-            )}
-            {decided && decision.outcome.status === "blocked" && (
-              <div role="alert" data-testid="publish-blocked">
-                <p>Blocked — the publish gate refused this report:</p>
-                <ul data-testid="blocked-reasons">
-                  {decision.outcome.reasons.map((reason) => (
-                    <li key={reason}>{reason}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            <Card aria-labelledby={titleId}>
+              <CardHeader>
+                <CardTitle id={titleId} className="capitalize">
+                  {item.kind} report · {item.period_start} to {item.period_end}
+                </CardTitle>
+                <Badge tone={item.review_due_at === null ? "neutral" : "warning"}>
+                  review due {item.review_due_at ?? "—"}
+                </Badge>
+              </CardHeader>
+              <CardBody className="flex flex-col gap-3">
+                {isDeparted && (
+                  <p data-testid="review-departed" className="text-ink-muted">
+                    No longer in the review queue — the publish decision below is why.
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <LinkButton variant="secondary" href={`/reports?report_id=${item.id}`}>
+                    View report
+                  </LinkButton>
+                  <Button
+                    variant="primary"
+                    loading={pending}
+                    disabled={published}
+                    onClick={() => void publish(item)}
+                  >
+                    Publish
+                  </Button>
+                </div>
+                {decision !== undefined && decision.kind === "failed" && (
+                  <div data-testid="publish-error">
+                    <ErrorState message={decision.message} />
+                  </div>
+                )}
+                {published && (
+                  <p data-testid="publish-published" className="font-semibold text-success">
+                    Published — the report is live.
+                  </p>
+                )}
+                {decided && decision.outcome.status === "blocked" && (
+                  <div
+                    role="alert"
+                    data-testid="publish-blocked"
+                    className="rounded-xl border-2 border-danger p-4"
+                  >
+                    <p className="font-semibold text-danger">
+                      Blocked — the publish gate refused this report:
+                    </p>
+                    <ul data-testid="blocked-reasons" className="mt-2 list-disc pl-6">
+                      {decision.outcome.reasons.map((reason) => (
+                        <li key={reason}>{reason}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </CardBody>
+            </Card>
           </li>
         );
       })}
