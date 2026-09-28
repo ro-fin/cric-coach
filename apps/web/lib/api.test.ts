@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  API_PROXY_BASE,
   ApiError,
   apiBase,
+  apiRequest,
   apiToken,
   authHeaders,
   clipMediaUrl,
@@ -134,29 +136,19 @@ describe("environment defaults", () => {
     vi.unstubAllEnvs();
   });
 
-  it("apiBase/apiToken/defaultConfig read the single NEXT_PUBLIC convention", () => {
-    // One client convention for every feature: NEXT_PUBLIC_API_BASE_URL +
-    // NEXT_PUBLIC_API_TOKEN (build-time, LAN deployment; see apps/web/README.md).
-    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://lab:9999");
-    vi.stubEnv("NEXT_PUBLIC_API_TOKEN", "secret");
-    expect(apiBase()).toBe("http://lab:9999");
-    expect(apiToken()).toBe("secret");
-    expect(defaultConfig()).toEqual({ baseUrl: "http://lab:9999", token: "secret" });
-  });
-
-  it("falls back to the LAN default base and an empty token", () => {
-    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", undefined);
-    vi.stubEnv("NEXT_PUBLIC_API_TOKEN", undefined);
-    expect(apiBase()).toBe("http://localhost:8000");
+  it("targets the same-origin proxy with no token (US-L3: the browser never holds it)", () => {
+    expect(API_PROXY_BASE).toBe("/api/cricai");
+    expect(apiBase()).toBe("/api/cricai");
     expect(apiToken()).toBe("");
-    expect(defaultConfig()).toEqual({ baseUrl: "http://localhost:8000", token: "" });
+    expect(authHeaders()).toEqual({});
+    expect(defaultConfig()).toEqual({ baseUrl: "/api/cricai", token: "" });
   });
 
-  it("authHeaders carries the env bearer token and stays empty without one", () => {
-    vi.stubEnv("NEXT_PUBLIC_API_TOKEN", undefined);
+  it("ignores the retired NEXT_PUBLIC_API_* variables", () => {
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://lab:9999");
+    vi.stubEnv("NEXT_PUBLIC_API_TOKEN", "leaked");
+    expect(defaultConfig()).toEqual({ baseUrl: "/api/cricai", token: "" });
     expect(authHeaders()).toEqual({});
-    vi.stubEnv("NEXT_PUBLIC_API_TOKEN", "tok-1");
-    expect(authHeaders()).toEqual({ Authorization: "Bearer tok-1" });
   });
 
   it("defaultMediaBase reads the env var with a LAN fallback", () => {
@@ -207,11 +199,12 @@ describe("listReviewQueue", () => {
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer tok");
   });
 
-  it("defaults to the NEXT_PUBLIC environment config", async () => {
-    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://lab:7777");
+  it("defaults to the same-origin proxy without a bearer", async () => {
     const spy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse([]));
     await expect(listReviewQueue()).resolves.toEqual([]);
-    expect(spy.mock.calls[0][0]).toBe("http://lab:7777/settings/review-queue");
+    const [url, init] = spy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/cricai/settings/review-queue");
+    expect(init.headers).not.toHaveProperty("Authorization");
     spy.mockRestore();
   });
 
@@ -296,12 +289,61 @@ describe("publishReport", () => {
     expect((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe(
       "http://lab:8000/reports/r1/publish",
     );
-    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://lab:7777");
     const spy = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(jsonResponse({ status: "published", reasons: [] }));
     await publishReport("r2");
-    expect(spy.mock.calls[0][0]).toBe("http://lab:7777/reports/r2/publish");
+    const [url, init] = spy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/cricai/reports/r2/publish");
+    expect(init.headers).toEqual({});
     spy.mockRestore();
+  });
+});
+
+describe("apiRequest", () => {
+  it("GETs JSON through the proxy by default, dropping undefined query params", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse([{ id: "a" }]));
+    await expect(
+      apiRequest("/alerts", { query: { audience: "parent", since: undefined } }),
+    ).resolves.toEqual([{ id: "a" }]);
+    expect(spy).toHaveBeenCalledWith("/api/cricai/alerts?audience=parent", {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      body: undefined,
+    });
+    spy.mockRestore();
+  });
+
+  it("sends a JSON body with its content type and the config bearer", async () => {
+    const fetchFn = fakeFetch(jsonResponse({ id: "w1" }, 201));
+    await expect(
+      apiRequest("/wellness", { method: "POST", body: { soreness: 2 } }, { ...CONFIG, fetchFn }),
+    ).resolves.toEqual({ id: "w1" });
+    expect(fetchFn).toHaveBeenCalledWith("http://lab:8000/wellness", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        Authorization: "Bearer tok",
+        "Content-Type": "application/json",
+      },
+      body: '{"soreness":2}',
+    });
+  });
+
+  it("resolves undefined on 204", async () => {
+    const fetchFn = fakeFetch(new Response(null, { status: 204 }));
+    await expect(
+      apiRequest("/notes/n1", { method: "DELETE" }, { ...CONFIG, fetchFn }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("throws ApiError with the server detail", async () => {
+    const fetchFn = fakeFetch(jsonResponse({ detail: "requires one of: [parent]" }, 403));
+    const error = (await apiRequest("/cameras", {}, { ...CONFIG, fetchFn }).catch(
+      (e: unknown) => e,
+    )) as ApiError;
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error.status).toBe(403);
+    expect(error.message).toBe("API 403: requires one of: [parent]");
   });
 });

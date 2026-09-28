@@ -23,10 +23,11 @@
 # start-time `uv sync --frozen` an offline no-op. The web service likewise
 # keeps node_modules/.next in named volumes.
 #
-# BUILD-TIME INLINING CAVEAT (web): Next.js inlines NEXT_PUBLIC_* at
-# `pnpm build`. The web service builds at container start from the current
-# env, so changing NEXT_PUBLIC_* means:
+# BUILD-TIME INLINING CAVEAT (web): Next.js inlines NEXT_PUBLIC_* (only
+# NEXT_PUBLIC_CRICAI_MEDIA_BASE is still read) at `pnpm build`. The web
+# service builds at container start from the current env, so changing it means:
 #   docker compose up -d --force-recreate web
+# The dashboard holds no API token: devices sign in at /login.
 
 name: cricai
 
@@ -182,8 +183,13 @@ services:
         pnpm --dir apps/web build &&
         pnpm --dir apps/web start -- -p 3000 -H 0.0.0.0
     environment:
-      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:?set in deploy/.env}
-      NEXT_PUBLIC_API_TOKEN: ${NEXT_PUBLIC_API_TOKEN:?set in deploy/.env}
+      # The dashboard server calls the API in-network with the token from the
+      # signed-in device's httpOnly cookie (Phase 8, apps/web/README.md).
+      CRICAI_API_BASE_URL: http://api:8000
+      # Retired: the dashboard no longer reads these. Pinned empty so a stale
+      # value in an old deploy/.env can never reach the container.
+      NEXT_PUBLIC_API_BASE_URL: ""
+      NEXT_PUBLIC_API_TOKEN: ""
       NEXT_PUBLIC_CRICAI_MEDIA_BASE: ${NEXT_PUBLIC_CRICAI_MEDIA_BASE:?set in deploy/.env}
     volumes:
       - ..:/app

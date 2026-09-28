@@ -198,9 +198,11 @@ export interface PublishOut {
 // ---------------------------------------------------------------------------
 
 export interface ApiConfig {
-  /** Absolute base of the cricai_api server, e.g. http://lab.local:8000. */
+  /** Base the paths hang off: the same-origin proxy `/api/cricai` in the
+   * browser, or an absolute API origin (server code, tests). */
   baseUrl: string;
-  /** LAN bearer token for the viewing role (US-L3). */
+  /** Bearer token. Empty in the browser: the proxy attaches the role token
+   * from the httpOnly session cookie, so no script ever holds it (US-L3). */
   token: string;
   /** Injectable fetch for tests; defaults to the global fetch. */
   fetchFn?: typeof fetch;
@@ -251,25 +253,70 @@ async function errorDetail(response: Response): Promise<string> {
   return response.statusText;
 }
 
-async function request<T>(
+/** Authorization header for a config's token; none when the token is empty (proxy mode). */
+function bearer(config: ApiConfig): Record<string, string> {
+  return config.token ? { Authorization: `Bearer ${config.token}` } : {};
+}
+
+/** `base + path + ?query`, without undefined params. Works for relative (proxy) bases. */
+function buildUrl(
   config: ApiConfig,
   path: string,
-  query: Record<string, string | number | undefined> = {},
-): Promise<T> {
-  const url = new URL(config.baseUrl.replace(/\/$/, "") + path);
+  query: Record<string, string | number | undefined>,
+): string {
+  const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {
     if (value !== undefined) {
-      url.searchParams.set(key, String(value));
+      params.set(key, String(value));
     }
   }
+  const search = params.toString();
+  return config.baseUrl.replace(/\/$/, "") + path + (search ? `?${search}` : "");
+}
+
+export interface ApiRequestInit {
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  query?: Record<string, string | number | undefined>;
+  /** JSON-serialised request body. */
+  body?: unknown;
+}
+
+/**
+ * One JSON call through the shared convention: base URL, auth, query
+ * building, ApiError with the server's detail on non-2xx; a 204 resolves to
+ * undefined. Feature clients should build on this instead of raw fetch.
+ */
+export async function apiRequest<T>(
+  path: string,
+  init: ApiRequestInit = {},
+  config: ApiConfig = defaultConfig(),
+): Promise<T> {
+  const { method = "GET", query = {}, body } = init;
+  const headers: Record<string, string> = { Accept: "application/json", ...bearer(config) };
+  if (body !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
   const fetchFn = config.fetchFn ?? fetch;
-  const response = await fetchFn(url.toString(), {
-    headers: { Authorization: `Bearer ${config.token}` },
+  const response = await fetchFn(buildUrl(config, path, query), {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!response.ok) {
     throw new ApiError(response.status, await errorDetail(response));
   }
+  if (response.status === 204) {
+    return undefined as T;
+  }
   return (await response.json()) as T;
+}
+
+function request<T>(
+  config: ApiConfig,
+  path: string,
+  query: Record<string, string | number | undefined> = {},
+): Promise<T> {
+  return apiRequest<T>(path, { query }, config);
 }
 
 export function createApiClient(config: ApiConfig): ApiClient {
@@ -296,29 +343,32 @@ export function createApiClient(config: ApiConfig): ApiClient {
 // ---------------------------------------------------------------------------
 // The single web API configuration convention (US-K1..K5, US-L3).
 //
-// EVERY dashboard feature (sessions/timeline, pitch map, notes, reports,
-// progress) reads exactly these two build-time variables — documented in
-// apps/web/README.md. There is no per-feature env name and no runtime
-// localStorage token: one Next.js build serves the whole LAN deployment.
+// The browser only talks to its own origin: every dashboard feature calls the
+// same-origin proxy /api/cricai/*, whose route handler forwards to cricai_api
+// (server-only CRICAI_API_BASE_URL) with the role token from the httpOnly
+// cricai_session cookie set by /login. No token is in the bundle, the API
+// needs no CORS, and one build serves every role (apps/web/README.md).
 // ---------------------------------------------------------------------------
 
-/** Absolute API origin from NEXT_PUBLIC_API_BASE_URL (LAN default). */
+/** Same-origin path of the API proxy (app/api/cricai/[...path]/route.ts). */
+export const API_PROXY_BASE = "/api/cricai";
+
+/** Base for every API path: the same-origin proxy. */
 export function apiBase(): string {
-  return process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+  return API_PROXY_BASE;
 }
 
-/** Role bearer token from NEXT_PUBLIC_API_TOKEN (build-time, US-L3). */
+/** Always empty: the browser never holds the role token (the proxy adds it). */
 export function apiToken(): string {
-  return process.env.NEXT_PUBLIC_API_TOKEN ?? "";
+  return "";
 }
 
-/** Authorization header for the configured token; empty when none is set. */
+/** No Authorization header from the browser; kept so feature clients compile unchanged. */
 export function authHeaders(): Record<string, string> {
-  const token = apiToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return {};
 }
 
-/** Config from the NEXT_PUBLIC_* build-time environment (LAN defaults). */
+/** Config for the same-origin proxy: no bearer. */
 export function defaultConfig(): ApiConfig {
   return { baseUrl: apiBase(), token: apiToken() };
 }
@@ -386,10 +436,7 @@ export async function publishReport(
 ): Promise<PublishOut> {
   const fetchFn = config.fetchFn ?? fetch;
   const url = `${config.baseUrl.replace(/\/$/, "")}/reports/${reportId}/publish`;
-  const response = await fetchFn(url, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${config.token}` },
-  });
+  const response = await fetchFn(url, { method: "POST", headers: bearer(config) });
   if (!response.ok && response.status !== 409) {
     throw new ApiError(response.status, await errorDetail(response));
   }

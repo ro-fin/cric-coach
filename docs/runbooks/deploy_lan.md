@@ -54,14 +54,17 @@ Edit `deploy/.env` (it is gitignored — never commit it):
    loudly if `CRICAI_DATABASE_URL` is unset (it would fall back to the weak
    `cricai:cricai`) or still carries a placeholder. Compose path: set
    `CRICAI_POSTGRES_PASSWORD` instead (the in-network URL is derived).
-3. **`NEXT_PUBLIC_*`** — the dashboard's API origin, bearer token and media
-   base. Use the **LAN address** (`http://lab.local:8000`), not localhost,
-   or other devices' browsers will call themselves. `NEXT_PUBLIC_API_TOKEN`
-   is **inlined into the JS bundle** and is therefore extractable by any
-   device that loads the dashboard — set it to the **least-privileged**
-   `CRICAI_PLAYER_TOKEN`, never the parent/coach admin tokens. Build a
-   separate, higher-privilege dashboard only for a device that stays in
-   parent/coach hands.
+3. **Dashboard** — the dashboard holds **no API token**. Each device signs in
+   at `/login` with the token of the role using it (player, parent or coach);
+   the dashboard server keeps it in an httpOnly cookie and calls the API on
+   the browser's behalf, so no browser script can read it and one build
+   serves every role. Set `CRICAI_API_BASE_URL` to where the **dashboard
+   server** reaches the API (`http://localhost:8000` on the process path;
+   compose ignores it and uses `http://api:8000`). It is read at runtime, so
+   a restart applies a change. `NEXT_PUBLIC_CRICAI_MEDIA_BASE` is the clip
+   media base (§7). Delete `NEXT_PUBLIC_API_BASE_URL` and
+   `NEXT_PUBLIC_API_TOKEN` from an older `deploy/.env`: they are retired and
+   no longer read.
 4. **Pose model (optional)** — `CRICAI_POSE_MODEL_ASSET` points the pose
    stage at a MediaPipe pose-landmarker `.task` bundle. Leave it empty to run
    the deterministic `FakePoseProvider`: analysis and reports still work, but
@@ -70,13 +73,13 @@ Edit `deploy/.env` (it is gitignored — never commit it):
    visible in the data — never silent — but a rig-from-doc deploy that wants
    real pose tracking must set this (and install the `pose` extra).
 
-> **Build-time inlining caveat.** Next.js inlines `NEXT_PUBLIC_*` into the
-> JS bundle when `pnpm build` runs. Changing any of them requires a
-> **rebuild**: process path — redo step 3.2 then restart; compose path —
+> **Build-time inlining caveat.** Next.js inlines `NEXT_PUBLIC_*` (today only
+> `NEXT_PUBLIC_CRICAI_MEDIA_BASE`) into the JS bundle when `pnpm build`
+> runs. Changing it requires a **rebuild**: process path — redo step 3.2
+> then restart; compose path —
 > `docker compose -f deploy/docker-compose.yaml up -d --force-recreate web`
-> (the web container rebuilds on every start). One build serves one
-> role/device class; build again with a different `NEXT_PUBLIC_API_TOKEN`
-> for a different role (see `apps/web/README.md`).
+> (the web container rebuilds on every start). Changing roles never needs a
+> rebuild: sign out and sign in again (see `apps/web/README.md`).
 
 ## 3. Process path (default; unit-verified, first live run is UAT-PA1)
 
@@ -88,7 +91,7 @@ uv sync --all-packages
 cd apps/web && pnpm install && cd ../..
 ```
 
-### 3.2 Build the dashboard (inlines NEXT_PUBLIC_*)
+### 3.2 Build the dashboard (inlines NEXT_PUBLIC_CRICAI_MEDIA_BASE)
 
 ```sh
 set -a; . deploy/.env; set +a
@@ -116,7 +119,7 @@ within its first two seconds. It starts, in order:
   the worker is forward wiring (and, on the compose path, the `exec` host the
   cron lines target);
 - **web** — `next start` on `CRICAI_WEB_PORT` (default 3000), serving the
-  build from 3.2.
+  build from 3.2 and proxying `/api/cricai/*` to `CRICAI_API_BASE_URL`.
 
 ### 3.4 Verify (black-box smoke)
 
@@ -151,7 +154,8 @@ Prefer `CRICAI_PARENT_TOKEN` (sourced above) or `--parent-token-file` over
 and shell history.
 
 Then do the cross-device check the UAT scripts use: from another LAN device,
-open `http://lab.local:3000` and confirm the dashboard loads data.
+open `http://lab.local:3000`, sign in (you land on `/login` the first time on
+each device), and confirm the dashboard loads data.
 
 ## 4. Compose path (authored; run it once Docker is fixed)
 
@@ -251,12 +255,14 @@ variable wherever you serve the tree, and rebuild web when it changes.
 | Symptom | Cause / fix |
 |---|---|
 | `deploy_local: ERROR: CRICAI_PARENT_TOKEN is empty` | Fill the tokens in `deploy/.env` (§2). The API has no auth-off mode. |
-| `apps/web/.next missing` | Run the dashboard build (§3.2) — it must happen **after** `NEXT_PUBLIC_*` are final. |
+| `apps/web/.next missing` | Run the dashboard build (§3.2) — it must happen **after** `NEXT_PUBLIC_CRICAI_MEDIA_BASE` is final. |
 | `verify_deploy` FAIL `auth-enforced` (tokenless got 200) | You are not talking to cricAI (wrong port/proxy). The API always 401s tokenless requests. |
 | `verify_deploy` FAIL `auth-parent-token` | Token mismatch between `deploy/.env` and the running API — restart after edits (`stop` then `start`). |
 | `verify_deploy` FAIL `session-lifecycle` with 409 | Machine sessions need a safety-checklist ack (US-A5); the smoke uses a coach throwdown, so a 409 here means lifecycle state corruption — check `.cricai-run/api.log`. |
-| Dashboard loads but every panel errors | `NEXT_PUBLIC_API_BASE_URL`/`NEXT_PUBLIC_API_TOKEN` were wrong **at build time** — fix `deploy/.env`, rebuild (§3.2), restart. Browser devtools will show calls to the wrong origin or 401s. |
-| Dashboard fine on the lab box, dead from other devices | `NEXT_PUBLIC_API_BASE_URL` says `localhost`. Rebuild with the LAN address. Also check the OS firewall allows 3000/8000 on the LAN. |
+| Sign-in says "The cricAI API could not be reached" / every panel answers 502 | The dashboard server cannot reach `CRICAI_API_BASE_URL` — fix it in `deploy/.env` (the API as seen **from the dashboard server**), then restart web. No rebuild needed. |
+| Sign-in says "That token is not a … token" | The token is valid but belongs to another role: pick the matching role or use that role's token from `deploy/.env`. |
+| Every page keeps returning to `/login` | The API rejected the stored token (tokens changed and the API restarted): the dashboard cleared the cookie; sign in with the current token. |
+| Dashboard fine on the lab box, dead from other devices | The OS firewall must allow 3000 on the LAN (other devices only talk to the dashboard, never to 8000). |
 | Clips don't play | `NEXT_PUBLIC_CRICAI_MEDIA_BASE` not serving `CRICAI_STORAGE_ROOT` (§7). |
 | `address already in use` in `.cricai-run/*.log` | Change `CRICAI_API_PORT`/`CRICAI_WEB_PORT` in `deploy/.env`, or stop the squatter. |
 | `pidfile … exists — already running?` after a crash | `scripts/deploy_local.sh stop` clears the stale pidfile, then `start`. `stop` is idempotent and only kills PIDs whose command still looks like ours — a PID the OS recycled onto an unrelated process is reported and left alone, never killed. |
