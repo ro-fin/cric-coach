@@ -150,3 +150,30 @@ export function densityT(count: number, peak: number): number {
 export function labelColor(t: number): string {
   return t > 0.5 ? "#000000" : "#ffffff";
 }
+
+// Design tokens (contract 3.1). Literal class names so Tailwind finds them.
+/** SVG fill per length zone, from the zone-* tokens. */
+export const ZONE_FILL_CLASS: Readonly<Record<LengthKey, string>> = {
+  yorker: "fill-zone-yorker",
+  full: "fill-zone-full",
+  good: "fill-zone-good",
+  short: "fill-zone-short",
+};
+
+/** Text colour per line channel, from the line-* tokens. */
+export const LINE_TEXT_CLASS: Readonly<Record<LineKey, string>> = {
+  outside_off: "text-line-outside-off",
+  off: "text-line-off",
+  middle: "text-line-middle",
+  leg: "text-line-leg",
+};
+
+/** Zone fill for a wire length label; an unknown label gets the muted ink. */
+export function zoneFillClass(length: string): string {
+  return (ZONE_FILL_CLASS as Record<string, string>)[length] ?? "fill-ink-muted";
+}
+
+/** Line colour for a wire line label; an unknown label gets the muted ink. */
+export function lineTextClass(line: string): string {
+  return (LINE_TEXT_CLASS as Record<string, string>)[line] ?? "text-ink-muted";
+}
