@@ -11,8 +11,23 @@
  * its own and shows loading, empty, error and degraded states honestly.
  */
 
+import { ShieldAlert } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, type ReactNode } from "react";
+import {
+  Badge,
+  Card,
+  CardBody,
+  CardHeader,
+  CardTitle,
+  DegradedBanner,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  Skeleton,
+  StatTile,
+} from "@/components/ui";
+import type { Role } from "@/lib/auth/role";
 import { createTodayApi } from "./api";
 import type { PlayerOut, ReportOut, TodayApi, WindowSummaryOut } from "./api";
 import { useLoad } from "./useLoad";
@@ -27,7 +42,6 @@ import {
   safetyLabel,
   workloadTone,
 } from "./view";
-import type { Role } from "./view";
 
 export interface TodayViewProps {
   role: Role | null;
@@ -35,34 +49,17 @@ export interface TodayViewProps {
   api?: TodayApi;
 }
 
-function Loading({ label }: { label: string }) {
-  return (
-    <div role="status" aria-label={label} className="animate-pulse text-ink-muted">
-      {label}
-    </div>
-  );
-}
+/** A link that looks like a primary button (no link variant in `Button`). */
+const PRIMARY_LINK =
+  "inline-flex min-h-11 items-center justify-center rounded-lg border-2 border-accent bg-accent px-4 font-semibold text-accent-ink hover:opacity-90";
+const TEXT_LINK = "inline-flex min-h-11 items-center font-semibold text-accent underline";
 
-function Failure({
-  what,
-  message,
-  httpStatus,
-  onRetry,
-}: {
-  what: string;
-  message: string;
-  httpStatus: number | null;
-  onRetry: () => void;
-}) {
-  const text = httpStatus === 403 ? `Your role cannot see ${what}.` : `Could not load ${what}: ${message}`;
-  return (
-    <div role="alert" className="rounded-lg border border-danger p-4 text-danger">
-      <p>{text}</p>
-      <button type="button" className="min-h-11" onClick={onRetry}>
-        Try again
-      </button>
-    </div>
-  );
+const NO_CEILING = "No ceiling set for this age band";
+
+function failureText(what: string, state: { message: string; httpStatus: number | null }) {
+  return state.httpStatus === 403
+    ? `Your role cannot see ${what}.`
+    : `Could not load ${what}: ${state.message}`;
 }
 
 function Panel<T>({
@@ -74,68 +71,60 @@ function Panel<T>({
   title: string;
   what: string;
   load: { state: LoadState<T>; retry: () => void };
-  children: (data: T) => React.ReactNode;
+  children: (data: T) => ReactNode;
 }) {
   const { state, retry } = load;
   return (
-    <section aria-label={title} className="rounded-xl border border-border bg-surface p-4">
-      <h2 className="text-xl font-semibold text-ink">{title}</h2>
-      {state.status === "loading" && <Loading label={`Loading ${what}`} />}
-      {state.status === "error" && (
-        <Failure
-          what={what}
-          message={state.message}
-          httpStatus={state.httpStatus}
-          onRetry={retry}
-        />
-      )}
-      {state.status === "ready" && children(state.data)}
-    </section>
-  );
-}
-
-function Empty({ title, action }: { title: string; action: React.ReactNode }) {
-  return (
-    <div className="py-4 text-ink-muted">
-      <p>{title}</p>
-      {action}
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardBody>
+        {state.status === "loading" && <Skeleton label={`Loading ${what}`} />}
+        {state.status === "error" && (
+          <ErrorState message={failureText(what, state)} onRetry={retry} />
+        )}
+        {state.status === "ready" && children(state.data)}
+      </CardBody>
+    </Card>
   );
 }
 
 function ReportContent({ report }: { report: ReportOut }) {
   const { body } = report;
-  const caveats = reportCaveats(report);
-  const safetyActive = body.safety !== null && body.safety.active;
+  const safety = body.safety;
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-5">
       <p className="text-ink-muted">Report for {report.period_start}</p>
-      {safetyActive && (
-        <p role="alert" className="rounded-lg bg-danger p-3 text-accent-ink">
-          {body.safety?.text}
+      {safety !== null && safety.active && (
+        <p
+          role="alert"
+          className="flex items-center gap-2 rounded-xl border-2 border-danger px-4 py-3 font-semibold text-danger"
+        >
+          <ShieldAlert aria-hidden="true" className="size-6 shrink-0" />
+          {safety.text}
         </p>
       )}
-      {caveats.length > 0 && (
-        <ul aria-label="Report caveats" className="rounded-lg border border-warning p-3">
-          {caveats.map((text) => (
-            <li key={text}>{text}</li>
-          ))}
-        </ul>
-      )}
-      <article aria-label="One correction">
-        <h3 className="font-semibold">One correction</h3>
+      <DegradedBanner reasons={reportCaveats(report)} />
+      <article aria-labelledby="today-correction">
+        <h3 id="today-correction" className="text-lg font-semibold">
+          One correction
+        </h3>
         {body.main_correction === null ? (
-          <p>No correction today.</p>
+          <p className="text-ink-muted">No correction today.</p>
         ) : (
           <>
-            <p>{body.main_correction.text}</p>
-            <ul aria-label="Evidence clips">
+            <p className="text-lg">{body.main_correction.text}</p>
+            <ul aria-label="Evidence clips" className="mt-2 flex flex-wrap gap-2">
               {evidenceLinks(body.main_correction.evidence, report.session_id).map((clip) => (
                 <li key={clip.key}>
                   {clip.href === null ? (
-                    clip.label
+                    <Badge tone="neutral">{clip.label}</Badge>
                   ) : (
-                    <Link href={clip.href} className="inline-flex min-h-11 items-center">
+                    <Link
+                      href={clip.href}
+                      className="inline-flex min-h-11 items-center rounded-lg border-2 border-border bg-surface-raised px-3 font-semibold text-ink"
+                    >
                       {clip.label}
                     </Link>
                   )}
@@ -145,23 +134,30 @@ function ReportContent({ report }: { report: ReportOut }) {
           </>
         )}
       </article>
-      <article aria-label="One drill">
-        <h3 className="font-semibold">One drill</h3>
-        <p>{body.drill === null ? "No drill today." : body.drill.text}</p>
+      <article aria-labelledby="today-drill">
+        <h3 id="today-drill" className="text-lg font-semibold">
+          One drill
+        </h3>
+        <p className={body.drill === null ? "text-ink-muted" : "text-lg"}>
+          {body.drill === null ? "No drill today." : body.drill.text}
+        </p>
       </article>
-      <article aria-label="One goal">
-        <h3 className="font-semibold">One goal</h3>
+      <article aria-labelledby="today-goal">
+        <h3 id="today-goal" className="text-lg font-semibold">
+          One goal
+        </h3>
         {body.goal === null ? (
-          <p>No goal today.</p>
+          <p className="text-ink-muted">No goal today.</p>
         ) : (
-          <p>
-            {body.goal.metric}
-            {body.goal.target === null ? " — no target set" : `: ${body.goal.target}`}
-          </p>
+          <StatTile
+            label={body.goal.metric}
+            value={body.goal.target === null ? null : String(body.goal.target)}
+            reason={body.goal.target === null ? "No target set" : null}
+          />
         )}
       </article>
-      {body.positive !== "" && <p className="text-success">{body.positive}</p>}
-      <Link href={`/reports?report_id=${report.id}`} className="inline-flex min-h-11 items-center">
+      {body.positive !== "" && <p className="font-semibold text-success">{body.positive}</p>}
+      <Link href={`/reports?report_id=${report.id}`} className={TEXT_LINK}>
         Open the full report
       </Link>
     </div>
@@ -169,24 +165,33 @@ function ReportContent({ report }: { report: ReportOut }) {
 }
 
 function WorkloadContent({ window }: { window: WindowSummaryOut }) {
-  const tone = workloadTone(window);
+  const ceiling = window.ceiling_overs;
   return (
-    <div data-tone={tone} className="space-y-2">
+    <div data-tone={workloadTone(window)} className="flex flex-col gap-4">
       <p className="text-ink-muted">
         {window.window_start} to {window.window_end}
       </p>
-      <p>
-        {window.ceiling_overs === null
-          ? `${window.weighted_overs} overs bowled — no ceiling set for this age band`
-          : `${window.weighted_overs} of ${window.ceiling_overs} overs bowled`}
-      </p>
-      {window.remaining_balls !== null && <p>{window.remaining_balls} balls left this week</p>}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <StatTile
+          label="Overs bowled"
+          value={String(window.weighted_overs)}
+          unit={ceiling === null ? undefined : `of ${ceiling}`}
+          reason={ceiling === null ? NO_CEILING : null}
+        />
+        <StatTile
+          label="Balls left this week"
+          value={window.remaining_balls === null ? null : String(window.remaining_balls)}
+          reason={window.remaining_balls === null ? NO_CEILING : null}
+        />
+      </div>
       {window.violations.length === 0 ? (
-        <p className="text-success">Within the safe workload.</p>
+        <Badge tone="success">Within the safe workload</Badge>
       ) : (
-        <ul aria-label="Workload warnings" className="text-danger">
+        <ul aria-label="Workload warnings" className="flex flex-wrap gap-2">
           {window.violations.map((code) => (
-            <li key={code}>{safetyLabel(code)}</li>
+            <li key={code}>
+              <Badge tone="danger">{safetyLabel(code)}</Badge>
+            </li>
           ))}
         </ul>
       )}
@@ -205,10 +210,11 @@ function PlayerToday({ api, player }: { api: TodayApi; player: PlayerOut }) {
         {(list) => {
           const report = latestPublished(list);
           return report === null ? (
-            <Empty
-              title="No published report yet."
+            <EmptyState
+              title="No published report yet"
+              description="A report appears here once a session is analysed and published."
               action={
-                <Link href="/sessions" className="inline-flex min-h-11 items-center">
+                <Link href="/sessions" className={TEXT_LINK}>
                   See sessions
                 </Link>
               }
@@ -221,10 +227,10 @@ function PlayerToday({ api, player }: { api: TodayApi; player: PlayerOut }) {
       <Panel title="Workload" what="the workload" load={workload}>
         {(windows) =>
           windows.length === 0 ? (
-            <Empty
-              title="No workload window returned."
+            <EmptyState
+              title="No workload window returned"
               action={
-                <Link href="/wellness" className="inline-flex min-h-11 items-center">
+                <Link href="/wellness" className={TEXT_LINK}>
                   Open wellness
                 </Link>
               }
@@ -242,40 +248,37 @@ export default function TodayView({ role, search, api: injected }: TodayViewProp
   const api = useMemo(() => injected ?? createTodayApi(), [injected]);
   const loadPlayers = useCallback(() => api.listPlayers(), [api]);
   const players = useLoad(loadPlayers);
-  const requested = playerIdFromSearch(search);
-  const player = players.state.status === "ready" ? pickPlayer(players.state.data, requested) : null;
+  const player =
+    players.state.status === "ready"
+      ? pickPlayer(players.state.data, playerIdFromSearch(search))
+      : null;
 
   return (
-    <main className="mx-auto max-w-5xl space-y-4 p-4">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-bold text-ink">Today</h1>
-          {player !== null && <p className="text-ink-muted">{player.name}</p>}
-        </div>
-        {canStartSession(role) && (
-          <Link
-            href={player === null ? "/sessions/new" : `/sessions/new?player=${player.id}`}
-            className="inline-flex min-h-11 items-center rounded-lg bg-accent px-4 text-accent-ink"
-          >
-            Start session
-          </Link>
-        )}
-      </header>
-      {players.state.status === "loading" && <Loading label="Loading players" />}
+    <main className="mx-auto w-full max-w-6xl p-4 md:p-6">
+      <PageHeader
+        title="Today"
+        description={player === null ? undefined : player.name}
+        actions={
+          canStartSession(role) ? (
+            <Link
+              href={player === null ? "/sessions/new" : `/sessions/new?player=${player.id}`}
+              className={PRIMARY_LINK}
+            >
+              Start session
+            </Link>
+          ) : undefined
+        }
+      />
+      {players.state.status === "loading" && <Skeleton label="Loading players" />}
       {players.state.status === "error" && (
-        <Failure
-          what="players"
-          message={players.state.message}
-          httpStatus={players.state.httpStatus}
-          onRetry={players.retry}
-        />
+        <ErrorState message={failureText("players", players.state)} onRetry={players.retry} />
       )}
       {players.state.status === "ready" &&
         (player === null ? (
-          <Empty
-            title="No players yet."
+          <EmptyState
+            title="No players yet"
             action={
-              <Link href="/settings" className="inline-flex min-h-11 items-center">
+              <Link href="/settings" className={TEXT_LINK}>
                 Add a player in settings
               </Link>
             }

@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { RoleProvider } from "@/lib/auth/role";
 import HomePage from "./page";
 
 vi.mock("next/navigation", () => ({
@@ -15,8 +16,12 @@ vi.mock("./_today/TodayView", () => ({
 }));
 
 describe("HomePage", () => {
-  it("renders Today with the URL's search string", () => {
-    render(<HomePage />);
-    expect(screen.getByText("today:null:?player=p9")).toBeInTheDocument();
+  it("renders Today with the signed-in role and the URL's search string", () => {
+    render(
+      <RoleProvider role="coach">
+        <HomePage />
+      </RoleProvider>,
+    );
+    expect(screen.getByText("today:coach:?player=p9")).toBeInTheDocument();
   });
 });

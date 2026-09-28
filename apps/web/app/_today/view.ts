@@ -5,9 +5,8 @@
  */
 
 import type { EvidenceMap } from "@/app/reports/api";
+import type { Role } from "@/lib/auth/roles";
 import type { PlayerOut, ReportOut, SafetyCode, WindowSummaryOut } from "./api";
-
-export type Role = "parent" | "coach" | "player";
 
 /** The `?player=` id when it names a listed player, else the first listed. */
 export function pickPlayer(players: PlayerOut[], requestedId: string | null): PlayerOut | null {

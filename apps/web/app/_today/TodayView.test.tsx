@@ -1,4 +1,4 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/api";
@@ -10,6 +10,7 @@ import {
   workloadWindow,
 } from "@/test/fixtures.core";
 import type { PlayerOut, ReportOut, TodayApi, WindowSummaryOut } from "./api";
+import { expectAxeClean } from "@/lib/testing/axe";
 import TodayView from "./TodayView";
 
 vi.mock("./api", async (importOriginal) => {
@@ -52,9 +53,9 @@ describe("TodayView", () => {
     expect(screen.getByRole("article", { name: "One drill" })).toHaveTextContent(
       "Tennis-ball head-still drill, 3 sets of 12.",
     );
-    expect(screen.getByRole("article", { name: "One goal" })).toHaveTextContent(
-      "head_movement_cm: 4",
-    );
+    const goalCard = screen.getByRole("article", { name: "One goal" });
+    expect(goalCard).toHaveTextContent("head_movement_cm");
+    expect(goalCard).toHaveTextContent("4");
     expect(screen.getByText("Great balance on the front foot today.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open the full report" })).toHaveAttribute(
       "href",
@@ -67,8 +68,8 @@ describe("TodayView", () => {
     const api = fakeApi({ players: async () => [player(), player({ id: "p2", name: "Meera" })] });
     render(<TodayView role="player" search="?player=p2" api={api} />);
     expect(await screen.findByText("Meera")).toBeInTheDocument();
-    expect(api.listDailyReports).toHaveBeenCalledWith("p2");
-    expect(api.workloadSummary).toHaveBeenCalledWith("p2");
+    await waitFor(() => expect(api.listDailyReports).toHaveBeenCalledWith("p2"));
+    await waitFor(() => expect(api.workloadSummary).toHaveBeenCalledWith("p2"));
   });
 
   it("renders null sections and report caveats honestly", async () => {
@@ -87,7 +88,7 @@ describe("TodayView", () => {
     expect(screen.getByText("No drill today.")).toBeInTheDocument();
     expect(screen.getByText("No goal today.")).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent("No bowling today.");
-    const caveats = screen.getByRole("list", { name: "Report caveats" });
+    const caveats = screen.getByRole("region", { name: "Incomplete data" });
     expect(caveats).toHaveTextContent("Side camera was missing for 20 balls.");
     expect(caveats).toHaveTextContent("40 of 60 balls analysed.");
   });
@@ -100,7 +101,7 @@ describe("TodayView", () => {
     });
     const api = fakeApi({ reports: async () => [dailyReport({ body, session_id: null })] });
     render(<TodayView role="player" search="" api={api} />);
-    expect(await screen.findByText("control_pct — no target set")).toBeInTheDocument();
+    expect(await screen.findByText("No target set")).toBeInTheDocument();
     expect(screen.queryByText("All clear.")).not.toBeInTheDocument();
     const clips = screen.getByRole("list", { name: "Evidence clips" });
     expect(clips).toHaveTextContent("Ball 3 · cam");
@@ -110,17 +111,19 @@ describe("TodayView", () => {
   it("shows the empty report state when nothing is published", async () => {
     const api = fakeApi({ reports: async () => [dailyReport({ status: "draft" })] });
     render(<TodayView role="coach" search="" api={api} />);
-    expect(await screen.findByText("No published report yet.")).toBeInTheDocument();
+    expect(await screen.findByText("No published report yet")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "See sessions" })).toHaveAttribute("href", "/sessions");
   });
 
   it("shows workload against the ceiling with verbatim numbers", async () => {
     render(<TodayView role="player" search="" api={fakeApi()} />);
-    const panel = await screen.findByRole("region", { name: "Workload" });
-    expect(await within(panel).findByText("16 of 24 overs bowled")).toBeInTheDocument();
-    expect(within(panel).getByText("48 balls left this week")).toBeInTheDocument();
-    expect(within(panel).getByText("2026-09-22 to 2026-09-28")).toBeInTheDocument();
-    expect(within(panel).getByText("Within the safe workload.")).toBeInTheDocument();
+    const panel = (await screen.findByText("2026-09-22 to 2026-09-28")).closest("section")!;
+    expect(within(panel).getByRole("heading", { name: "Workload" })).toBeInTheDocument();
+    expect(within(panel).getByText("Overs bowled").parentElement).toHaveTextContent("16of 24");
+    expect(within(panel).getByText("Balls left this week").parentElement).toHaveTextContent(
+      "48",
+    );
+    expect(within(panel).getByText("Within the safe workload")).toBeInTheDocument();
   });
 
   it("lists workload violations and handles a missing ceiling", async () => {
@@ -137,15 +140,13 @@ describe("TodayView", () => {
     const warnings = await screen.findByRole("list", { name: "Workload warnings" });
     expect(warnings).toHaveTextContent("Weekly bowling ceiling reached");
     expect(warnings).toHaveTextContent("Pain reported");
-    expect(
-      screen.getByText("16 overs bowled — no ceiling set for this age band"),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/balls left this week/)).not.toBeInTheDocument();
+    expect(screen.getAllByText("No ceiling set for this age band")).toHaveLength(2);
+    expect(screen.getByText("Overs bowled").parentElement).toHaveTextContent("16");
   });
 
   it("shows the empty workload state", async () => {
     render(<TodayView role="player" search="" api={fakeApi({ workload: async () => [] })} />);
-    expect(await screen.findByText("No workload window returned.")).toBeInTheDocument();
+    expect(await screen.findByText("No workload window returned")).toBeInTheDocument();
   });
 
   it("shows loading states with labels while reads are pending", async () => {
@@ -153,13 +154,11 @@ describe("TodayView", () => {
     const reports = deferred<ReportOut[]>();
     const api = fakeApi({ players: () => players.promise, reports: () => reports.promise });
     render(<TodayView role="player" search="" api={api} />);
-    expect(screen.getByRole("status", { name: "Loading players" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading players");
     await act(async () => players.resolve([player()]));
-    expect(
-      screen.getByRole("status", { name: "Loading today's report" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Loading today's report")).toBeInTheDocument();
     await act(async () => reports.resolve([]));
-    expect(screen.queryByRole("status", { name: "Loading today's report" })).toBeNull();
+    expect(screen.queryByText("Loading today's report")).toBeNull();
   });
 
   it("shows an error with retry, and retrying loads the report", async () => {
@@ -202,7 +201,7 @@ describe("TodayView", () => {
 
   it("shows the empty players state", async () => {
     render(<TodayView role="parent" search="" api={fakeApi({ players: async () => [] })} />);
-    expect(await screen.findByText("No players yet.")).toBeInTheDocument();
+    expect(await screen.findByText("No players yet")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Start session" })).toHaveAttribute(
       "href",
       "/sessions/new",
@@ -220,6 +219,13 @@ describe("TodayView", () => {
     render(<TodayView role="player" search="" api={fakeApi()} />);
     await screen.findByText("Arjun");
     expect(screen.queryByRole("link", { name: "Start session" })).not.toBeInTheDocument();
+  });
+
+  it("has no axe violations with a full report", async () => {
+    const { container } = render(<TodayView role="parent" search="" api={fakeApi()} />);
+    await screen.findByRole("article", { name: "One correction" });
+    await screen.findByText("Within the safe workload");
+    await expectAxeClean(container);
   });
 
   it("builds the default API client when none is injected", async () => {

@@ -4,12 +4,13 @@
 
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { useRole } from "@/lib/auth/role";
 import TodayView from "./_today/TodayView";
 
 function TodayRoute() {
   const params = useSearchParams();
-  // Role arrives with the Phase 8 shell (useRole); until then Start session stays hidden.
-  return <TodayView role={null} search={`?${params.toString()}`} />;
+  const role = useRole();
+  return <TodayView role={role} search={`?${params.toString()}`} />;
 }
 
 export default function HomePage() {
