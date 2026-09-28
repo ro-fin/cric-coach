@@ -4,8 +4,7 @@
  * state machine's verdict exactly as served (US-K4 data parity).
  */
 
-import { defaultConfig, type ApiConfig } from "@/lib/api";
-import { request } from "../pipeline/http";
+import { apiRequest, defaultConfig, type ApiConfig } from "@/lib/api";
 
 /** Server bounds (cricai_coaching.wellness), mirrored so the form can explain
  * a value before posting it. The server stays the authority: its 422 problem
@@ -126,21 +125,21 @@ export interface WellnessApi {
 
 export function createWellnessApi(config: ApiConfig = defaultConfig()): WellnessApi {
   return {
-    listPlayers: () => request<PlayerOut[]>(config, "/players"),
+    listPlayers: () => apiRequest<PlayerOut[]>("/players", {}, config),
     listCheckins: (playerId, range = {}) =>
-      request<CheckinOut[]>(config, `/wellness/${playerId}/checkins`, {
+      apiRequest<CheckinOut[]>(`/wellness/${playerId}/checkins`, {
         query: { start: range.start, end: range.end },
-      }),
+      }, config),
     createCheckin: (playerId, body) =>
-      request<CheckinOut>(config, `/wellness/${playerId}/checkins`, { method: "POST", body }),
+      apiRequest<CheckinOut>(`/wellness/${playerId}/checkins`, { method: "POST", body }, config),
     clearPain: (playerId, checkinId, note) =>
-      request<ClearanceOut>(config, `/wellness/${playerId}/checkins/${checkinId}/clearance`, {
+      apiRequest<ClearanceOut>(`/wellness/${playerId}/checkins/${checkinId}/clearance`, {
         method: "POST",
         body: { note },
-      }),
+      }, config),
     state: (playerId, asOf) =>
-      request<WellnessStateOut>(config, `/wellness/${playerId}/state`, {
+      apiRequest<WellnessStateOut>(`/wellness/${playerId}/state`, {
         query: { as_of: asOf },
-      }),
+      }, config),
   };
 }

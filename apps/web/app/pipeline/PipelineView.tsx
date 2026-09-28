@@ -21,6 +21,7 @@ import {
   DegradedBanner,
   EmptyState,
   ErrorState,
+  ForbiddenState,
   LinkButton,
   PageHeader,
   Skeleton,
@@ -37,7 +38,6 @@ import { cn } from "@/lib/cn";
 import { degradedReasons } from "../pitchmap/view";
 import { accessFor, failure, type Load, LOADING, ready } from "./access";
 import { createPipelineApi, type RunDetailOut, type RunSummaryOut } from "./api";
-import { Forbidden } from "./Forbidden";
 import {
   canTrigger,
   formatWhen,
@@ -355,7 +355,7 @@ export default function PipelineView({ config }: PipelineViewProps) {
     return (
       <main className="flex flex-col gap-6">
         {header}
-        <Forbidden roles={PIPELINE_ROLES} />
+        <ForbiddenState roles={PIPELINE_ROLES} />
       </main>
     );
   }
@@ -373,7 +373,7 @@ export default function PipelineView({ config }: PipelineViewProps) {
           onRetry={() => setSessionsAttempt((value) => value + 1)}
         />
       )}
-      {sessions.kind === "forbidden" && <Forbidden roles={PIPELINE_ROLES} detail={sessions.message} />}
+      {sessions.kind === "forbidden" && <ForbiddenState roles={PIPELINE_ROLES} detail={sessions.message} />}
       {sessions.kind === "ready" && sessions.data.length === 0 && (
         <EmptyState
           title="No sessions yet"
@@ -424,7 +424,7 @@ export default function PipelineView({ config }: PipelineViewProps) {
                   onRetry={() => setRunsAttempt((value) => value + 1)}
                 />
               )}
-              {runs.kind === "forbidden" && <Forbidden roles={PIPELINE_ROLES} detail={runs.message} />}
+              {runs.kind === "forbidden" && <ForbiddenState roles={PIPELINE_ROLES} detail={runs.message} />}
               {runs.kind === "ready" && runs.data.length === 0 && (
                 <EmptyState
                   title="No pipeline runs for this session yet"
@@ -455,7 +455,7 @@ export default function PipelineView({ config }: PipelineViewProps) {
                   />
                 )}
                 {trace.kind === "forbidden" && (
-                  <Forbidden roles={PIPELINE_ROLES} detail={trace.message} />
+                  <ForbiddenState roles={PIPELINE_ROLES} detail={trace.message} />
                 )}
                 {trace.kind === "ready" && <TraceTable run={trace.data} />}
               </CardBody>

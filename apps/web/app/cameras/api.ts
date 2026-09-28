@@ -4,8 +4,7 @@
  * field for field; the screen renders them exactly as served.
  */
 
-import { defaultConfig, type ApiConfig } from "@/lib/api";
-import { request } from "../pipeline/http";
+import { apiRequest, defaultConfig, type ApiConfig } from "@/lib/api";
 
 /** cricai_data.enums.CameraRole. */
 export type CameraRole = "batting_side" | "bowling_side" | "wrist" | "front_on" | "other";
@@ -68,14 +67,14 @@ export interface CamerasApi {
 export function createCamerasApi(config: ApiConfig = defaultConfig()): CamerasApi {
   return {
     listCameras: (params = {}) =>
-      request<CameraOut[]>(config, "/cameras", {
+      apiRequest<CameraOut[]>("/cameras", {
         query: { include_history: params.includeHistory, role: params.role },
-      }),
+      }, config),
     setRole: (cameraId, role) =>
-      request<CameraOut>(config, `/cameras/${cameraId}`, { method: "PATCH", body: { role } }),
+      apiRequest<CameraOut>(`/cameras/${cameraId}`, { method: "PATCH", body: { role } }, config),
     listHealthChecks: (sessionId) =>
-      request<HealthCheckRecordOut[]>(config, "/health-checks", {
+      apiRequest<HealthCheckRecordOut[]>("/health-checks", {
         query: { session_id: sessionId },
-      }),
+      }, config),
   };
 }

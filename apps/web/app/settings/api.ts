@@ -5,8 +5,7 @@
  * approve which change and answers 403 with the missing approval named.
  */
 
-import { defaultConfig, type ApiConfig } from "@/lib/api";
-import { request } from "../pipeline/http";
+import { apiRequest, defaultConfig, type ApiConfig } from "@/lib/api";
 
 /** cricai_data.enums.ReviewMode. */
 export type ReviewMode = "auto_publish" | "coach_gate";
@@ -43,9 +42,9 @@ export interface SettingsApi {
 
 export function createSettingsApi(config: ApiConfig = defaultConfig()): SettingsApi {
   return {
-    active: () => request<AppSettingsOut>(config, "/settings"),
-    versions: () => request<AppSettingsOut[]>(config, "/settings/versions"),
+    active: () => apiRequest<AppSettingsOut>("/settings", {}, config),
+    versions: () => apiRequest<AppSettingsOut[]>("/settings/versions", {}, config),
     createVersion: (body) =>
-      request<AppSettingsOut>(config, "/settings", { method: "POST", body }),
+      apiRequest<AppSettingsOut>("/settings", { method: "POST", body }, config),
   };
 }

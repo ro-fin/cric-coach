@@ -7,8 +7,7 @@
  * proxy configuration (`defaultConfig()`) applies here untouched.
  */
 
-import { defaultConfig, type ApiConfig } from "@/lib/api";
-import { request } from "./http";
+import { apiRequest, defaultConfig, type ApiConfig } from "@/lib/api";
 
 // ---------------------------------------------------------------------------
 // Enum vocabularies (cricai_data.enums / cricai_worker.pipeline wire values).
@@ -125,16 +124,16 @@ export interface PipelineApi {
 export function createPipelineApi(config: ApiConfig = defaultConfig()): PipelineApi {
   return {
     listRuns: (sessionId) =>
-      request<RunSummaryOut[]>(config, `/pipeline/sessions/${sessionId}/runs`),
-    runDetail: (runId) => request<RunDetailOut>(config, `/pipeline/runs/${runId}`),
+      apiRequest<RunSummaryOut[]>(`/pipeline/sessions/${sessionId}/runs`, {}, config),
+    runDetail: (runId) => apiRequest<RunDetailOut>(`/pipeline/runs/${runId}`, {}, config),
     triggerRun: (sessionId, body = {}) =>
-      request<RunOut>(config, `/pipeline/sessions/${sessionId}/runs`, { method: "POST", body }),
+      apiRequest<RunOut>(`/pipeline/sessions/${sessionId}/runs`, { method: "POST", body }, config),
     resumeRun: (sessionId, body = {}) =>
-      request<RunOut>(config, `/pipeline/sessions/${sessionId}/resume`, { method: "POST", body }),
+      apiRequest<RunOut>(`/pipeline/sessions/${sessionId}/resume`, { method: "POST", body }, config),
     rederive: (sessionId, body = {}) =>
-      request<RederiveOut>(config, `/pipeline/sessions/${sessionId}/rederive`, {
+      apiRequest<RederiveOut>(`/pipeline/sessions/${sessionId}/rederive`, {
         method: "POST",
         body,
-      }),
+      }, config),
   };
 }

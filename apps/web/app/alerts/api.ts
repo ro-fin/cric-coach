@@ -5,8 +5,7 @@
  * sees developer-audience alerts, and players get 403.
  */
 
-import { defaultConfig, type ApiConfig } from "@/lib/api";
-import { request } from "../pipeline/http";
+import { apiRequest, defaultConfig, type ApiConfig } from "@/lib/api";
 
 /** cricai_data.enums.AlertAudience. */
 export type AlertAudience = "parent" | "developer";
@@ -36,10 +35,10 @@ export interface AlertsApi {
 export function createAlertsApi(config: ApiConfig = defaultConfig()): AlertsApi {
   return {
     listAlerts: (filter = {}) =>
-      request<AlertOut[]>(config, "/alerts", {
+      apiRequest<AlertOut[]>("/alerts", {
         query: { audience: filter.audience, acknowledged: filter.acknowledged },
-      }),
+      }, config),
     acknowledge: (alertId) =>
-      request<AlertOut>(config, `/alerts/${alertId}/ack`, { method: "POST" }),
+      apiRequest<AlertOut>(`/alerts/${alertId}/ack`, { method: "POST" }, config),
   };
 }

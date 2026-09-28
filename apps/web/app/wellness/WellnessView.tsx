@@ -19,6 +19,7 @@ import {
   Dialog,
   EmptyState,
   ErrorState,
+  ForbiddenState,
   PageHeader,
   Skeleton,
   StatTile,
@@ -27,7 +28,6 @@ import {
 import { type ApiConfig, defaultConfig } from "@/lib/api";
 import { useRole } from "@/lib/auth/role";
 import { failure, type Load, LOADING, ready } from "../pipeline/access";
-import { Forbidden } from "../pipeline/Forbidden";
 import {
   type CheckinOut,
   createWellnessApi,
@@ -313,7 +313,7 @@ export default function WellnessView({ config }: WellnessViewProps) {
           onRetry={() => setPlayersAttempt((value) => value + 1)}
         />
       )}
-      {players.kind === "forbidden" && <Forbidden roles={WELLNESS_ROLES} detail={players.message} />}
+      {players.kind === "forbidden" && <ForbiddenState roles={WELLNESS_ROLES} detail={players.message} />}
       {players.kind === "ready" && players.data.length === 0 && (
         <EmptyState title={COPY.noPlayersTitle} description={COPY.noPlayersDescription} />
       )}
@@ -339,7 +339,7 @@ export default function WellnessView({ config }: WellnessViewProps) {
           {data.kind === "error" && (
             <ErrorState message={`${COPY.loadFailed}: ${data.message}`} onRetry={reload} />
           )}
-          {data.kind === "forbidden" && <Forbidden roles={WELLNESS_ROLES} detail={data.message} />}
+          {data.kind === "forbidden" && <ForbiddenState roles={WELLNESS_ROLES} detail={data.message} />}
           {data.kind === "ready" && (
             <div className="grid gap-6 lg:grid-cols-2">
               <div className="flex flex-col gap-6">

@@ -11,7 +11,7 @@ function client(body: unknown) {
   return { fetchFn, api: createPipelineApi({ baseUrl: "http://lab", token: "t", fetchFn }) };
 }
 
-const AUTH = { Authorization: "Bearer t" };
+const AUTH = { Accept: "application/json", Authorization: "Bearer t" };
 const JSON_AUTH = { ...AUTH, "Content-Type": "application/json" };
 
 describe("createPipelineApi", () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/api";
-import { accessFor, failure, LOADING, ready, rolesText } from "./access";
+import { accessFor, failure, LOADING, ready } from "./access";
 
 describe("accessFor", () => {
   it("lets the API decide while the role is unknown", () => {
@@ -37,11 +37,3 @@ describe("load states", () => {
   });
 });
 
-describe("rolesText", () => {
-  it("joins roles for a sentence", () => {
-    expect(rolesText([])).toBe("");
-    expect(rolesText(["parent"])).toBe("parent");
-    expect(rolesText(["parent", "coach"])).toBe("parent or coach");
-    expect(rolesText(["parent", "coach", "player"])).toBe("parent, coach or player");
-  });
-});

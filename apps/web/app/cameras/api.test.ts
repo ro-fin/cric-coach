@@ -26,7 +26,7 @@ describe("createCamerasApi", () => {
     await api.setRole("C5", null);
     expect(fetchFn).toHaveBeenNthCalledWith(1, "http://lab/cameras/C5", {
       method: "PATCH",
-      headers: { Authorization: "Bearer t", "Content-Type": "application/json" },
+      headers: { Accept: "application/json", Authorization: "Bearer t", "Content-Type": "application/json" },
       body: '{"role":"bowling_side"}',
     });
     expect(fetchFn.mock.calls[1][1].body).toBe('{"role":null}');

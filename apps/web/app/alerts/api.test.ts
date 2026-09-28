@@ -17,7 +17,7 @@ describe("createAlertsApi", () => {
     await expect(api.listAlerts()).resolves.toEqual([alert()]);
     expect(fetchFn).toHaveBeenCalledWith("http://lab/alerts", {
       method: "GET",
-      headers: { Authorization: "Bearer t" },
+      headers: { Accept: "application/json", Authorization: "Bearer t" },
     });
   });
 
@@ -35,7 +35,7 @@ describe("createAlertsApi", () => {
     await expect(api.acknowledge("a1")).resolves.toEqual(acked);
     expect(fetchFn).toHaveBeenCalledWith("http://lab/alerts/a1/ack", {
       method: "POST",
-      headers: { Authorization: "Bearer t" },
+      headers: { Accept: "application/json", Authorization: "Bearer t" },
     });
   });
 

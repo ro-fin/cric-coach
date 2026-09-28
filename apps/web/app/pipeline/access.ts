@@ -44,10 +44,3 @@ export function failure(error: unknown): Load<never> {
   return { kind: "error", message: error instanceof Error ? error.message : String(error) };
 }
 
-/** Human line for a role list: "parent or coach". */
-export function rolesText(roles: readonly Role[]): string {
-  if (roles.length <= 1) {
-    return roles.join("");
-  }
-  return `${roles.slice(0, -1).join(", ")} or ${roles[roles.length - 1]}`;
-}

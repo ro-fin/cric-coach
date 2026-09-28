@@ -26,7 +26,7 @@ describe("createSettingsApi", () => {
     await expect(api.createVersion(body)).resolves.toMatchObject({ version: 2 });
     expect(fetchFn).toHaveBeenCalledWith("http://lab/settings", {
       method: "POST",
-      headers: { Authorization: "Bearer t", "Content-Type": "application/json" },
+      headers: { Accept: "application/json", Authorization: "Bearer t", "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
   });
