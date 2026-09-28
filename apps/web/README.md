@@ -100,3 +100,30 @@ run commands are in the header of `deploy/Dockerfile.web`.
 - `pnpm lint` / `pnpm typecheck` — gates
 - `pnpm test` — vitest with 100% line/branch coverage thresholds
 - `pnpm build` — production build
+
+## Local development against demo data
+
+```sh
+uv run scripts/dev_stack.py            # real API on in-memory SQLite + seeded demo + `pnpm dev`
+uv run scripts/dev_stack.py --web-mode prod   # same, served from a production build
+```
+
+The stack prints three fixed development role tokens to sign in with. The demo
+has an analyzed session (24 tagged balls, 12 edged cover drives, C1/C2 clips), a
+degraded session missing C2, a published daily report that went through the real
+publish gate and a draft held in the coach review queue. `POST /__dev/reset`
+(parent token) reseeds it; that route exists only in the dev stack.
+
+## Tests
+
+- `pnpm test` — vitest at 100% line/branch/function/statement coverage. Shared
+  helpers live in `test/` (fixtures, `createFakeApi`, `renderWithShell`,
+  `expectHonestStates`, `expectNoA11yViolations`); they are test support and
+  excluded from the threshold, proven by `test/helpers.test.tsx`.
+- `test/contract.test.ts` — pins every enum and response mirror in `lib/api.ts`
+  to the API's OpenAPI schema in `test/openapi.json`. After a router change run
+  `uv run scripts/dump_openapi.py` (CI fails when the dump is stale).
+- `pnpm e2e` — Playwright journeys from `docs/uat_scripts.md` on a tablet and a
+  desktop viewport against the dev stack's production build. One-time:
+  `pnpm exec playwright install chromium`. `E2E_WEB_URL` / `E2E_API_URL` point
+  the journeys at a stack that is already running. Artifacts: `.cricai-run/e2e/`.

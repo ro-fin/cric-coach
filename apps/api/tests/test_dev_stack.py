@@ -77,6 +77,15 @@ def test_published_report_passed_the_gate_and_the_player_sees_only_it(
     body = player_view[0]["body"]
     assert f"Seen on {dev_stack.FAULT_BALLS} balls" in body["main_correction"]["text"]
     assert len(body["main_correction"]["evidence"]) == dev_stack.FAULT_BALLS
+    # Report-body-v1: every key the real builder writes is present (the reports
+    # page crashed on a seed without fatigue_note; T2 found it on the dev stack).
+    for key in ("coverage_note", "fatigue_note", "honesty_banner", "safety", "secondary"):
+        assert key in body, key
+    assert body["goal"]["target"] == dev_stack.GOAL_TARGET
+    assert {claim["recompute_key"].rsplit(":", 1)[1] for claim in body["claims"]} == {
+        "n",
+        "threshold",
+    }
 
 
 def test_review_queue_holds_the_draft_for_the_coach_only(

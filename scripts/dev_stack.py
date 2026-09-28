@@ -52,6 +52,7 @@ from typing import Any
 import uvicorn
 from cricai_api.app import create_app
 from cricai_api.settings import Settings
+from cricai_coaching.contracts import validate_report_body
 from cricai_data.db import create_all
 from cricai_data.enums import (
     ClipStatus,
@@ -86,6 +87,8 @@ CAMERAS = ("C1", "C2")
 FAULT_BALLS = 12
 ANALYZED_BALLS = 24
 DEGRADED_BALLS = 6
+#: The goal the demo report sets (control on full balls outside off), from the finding payload.
+GOAL_TARGET = 70.0
 
 
 @dataclass(frozen=True)
@@ -217,7 +220,7 @@ def _seed_balls(
 def _report_body(
     kind: str, day: date, finding_id: str, evidence: dict[str, dict[str, str]], n: int
 ) -> dict[str, Any]:
-    return {
+    body: dict[str, Any] = {
         "kind": kind,
         "period": {"start": day.isoformat(), "end": day.isoformat()},
         "main_correction": {
@@ -238,17 +241,28 @@ def _report_body(
         },
         "goal": {
             "metric": "control_pct",
-            "target": None,
+            "target": GOAL_TARGET,
             "condition": {"line": "outside_off", "length": "full"},
         },
         "secondary": [],
         "positive": "Your straight drive stayed along the ground all session.",
         "safety": None,
         "honesty_banner": None,
+        "coverage_note": None,
+        "fatigue_note": None,
         "claims": [
-            {"value": n, "metric": "ball_count", "recompute_key": f"finding:{finding_id}:n"}
+            {"value": n, "metric": "ball_count", "recompute_key": f"finding:{finding_id}:n"},
+            {
+                "value": GOAL_TARGET,
+                "metric": "control_pct",
+                "recompute_key": f"finding:{finding_id}:threshold",
+            },
         ],
     }
+    # Pin the seed to the Report-body-v1 contract the real builder and the
+    # dashboard share: a key the builder always writes must be here too.
+    validate_report_body(body)
+    return body
 
 
 def seed_demo(app: FastAPI) -> SeedSummary:
@@ -306,7 +320,7 @@ def seed_demo(app: FastAPI) -> SeedSummary:
                 confidence=0.9,
                 ball_ids=sorted(fault_balls),
                 evidence={},
-                payload={},
+                payload={"threshold": GOAL_TARGET},
             )
             db.add(finding)
             db.flush()

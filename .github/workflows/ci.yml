@@ -22,6 +22,8 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy packages apps/api/src apps/worker/src scripts
+      # Phase 8: the checked-in OpenAPI dump the dashboard contract test pins to.
+      - run: uv run scripts/dump_openapi.py --check
       - run: make test-unit
 
   python-integration:
@@ -76,3 +78,36 @@ jobs:
       - run: pnpm --filter cricai-web typecheck
       - run: pnpm --filter cricai-web test
       - run: pnpm --filter cricai-web build
+
+  web-e2e:
+    name: Web — end-to-end journeys (Playwright, production build)
+    # Phase 8. Not yet a merge gate: it boots the whole stack (real API on
+    # SQLite + seeded demo + `next build` + `next start`) and needs the rig UAT
+    # before it is trusted to block. Promote by adding it to branch protection.
+    runs-on: ubuntu-latest
+    needs: [web]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: uv sync --all-packages
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter cricai-web exec playwright install --with-deps chromium
+      - run: pnpm --filter cricai-web e2e
+        env:
+          CI: "1"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: .cricai-run/e2e/
+          retention-days: 7

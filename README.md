@@ -45,6 +45,9 @@ make check        # lint + typecheck + unit tests (100% coverage gates) + web
 make test-integration   # real postgres/redis/ffmpeg tests
 make safety       # SAF suite — release-gating, never waivable
 make seed         # generate the synthetic demo session
+make dev          # dashboard against a seeded in-memory API (scripts/dev_stack.py)
+make contract     # the checked-in OpenAPI dump is current (web contract test pins to it)
+make web-e2e      # Playwright UAT journeys, tablet + desktop, production build
 ```
 
 Every Python package is gated at **100% line+branch coverage**; the web app is gated
