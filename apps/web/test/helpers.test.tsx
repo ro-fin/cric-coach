@@ -6,13 +6,15 @@
 import { cleanup, screen } from "@testing-library/react";
 import { useEffect, useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
+import { useToast } from "@/components/ui/Toast";
 import { ApiError } from "@/lib/api";
+import { useRole } from "@/lib/auth/role";
 import type { ApiClient, SessionOut } from "@/lib/api";
 import { expectNoA11yViolations } from "./axe";
 import { createFakeApi } from "./fakeApi";
 import { clip, event, metricValue, phaseMetrics, reviewItem, session, tag, video } from "./fixtures";
 import { renderWithShell } from "./render";
-import { expectHonestStates } from "./states";
+import { expectHonestStates, expectHonestStatesWith } from "./states";
 
 afterEach(cleanup);
 
@@ -198,7 +200,6 @@ describe("expectHonestStates", () => {
       empty: { items: [], total: 0, limit: 50, offset: 0 },
       emptyText: "No sessions yet",
     });
-    expect(document.documentElement.dataset.role).toBe("coach");
   });
 
   it("accepts text matchers for every state", async () => {
@@ -216,6 +217,45 @@ describe("expectHonestStates", () => {
     expect(window.location.search).toBe("?x=1");
   });
 
+  it("drives a hand-rolled local fake through a StateDriver", async () => {
+    type Mode = "ok" | "empty" | number;
+    let mode: Mode = "ok";
+    let gate: Promise<void> = Promise.resolve();
+    const local: ApiClient = {
+      ...createFakeApi(),
+      listSessions: async () => {
+        await gate;
+        if (typeof mode === "number") {
+          throw new ApiError(mode, "local");
+        }
+        return { items: mode === "empty" ? [] : [session()], total: 0, limit: 50, offset: 0 };
+      },
+    };
+    await expectHonestStatesWith({
+      render: () => renderWithShell(<SessionCount client={local} />),
+      driver: {
+        reset: () => {
+          mode = "ok";
+          gate = Promise.resolve();
+        },
+        hold: () => {
+          let release: () => void = () => undefined;
+          gate = new Promise((resolve) => {
+            release = resolve;
+          });
+          return release;
+        },
+        respondEmpty: () => {
+          mode = "empty";
+        },
+        fail: (status) => {
+          mode = status;
+        },
+      },
+      emptyText: "No sessions yet",
+    });
+  });
+
   it("fails for a component with no loading marker", async () => {
     const api = createFakeApi();
     function Silent() {
@@ -229,7 +269,34 @@ describe("expectHonestStates", () => {
         empty: [],
         emptyText: "nothing here",
       }),
-    ).rejects.toThrow(/role=status/);
+    ).rejects.toThrow(/aria-busy/);
+  });
+});
+
+describe("renderWithShell", () => {
+  function Probe() {
+    const role = useRole();
+    const { toast } = useToast();
+    return (
+      <button type="button" onClick={() => toast({ title: "Saved" })}>
+        role:{role ?? "signed-out"}
+      </button>
+    );
+  }
+
+  it("provides the role and the toast context", async () => {
+    renderWithShell(<Probe />, { role: "coach" });
+    const button = screen.getByRole("button", { name: "role:coach" });
+    button.click();
+    expect(await screen.findByText("Saved")).toBeInTheDocument();
+  });
+
+  it("defaults to parent and supports signed out", () => {
+    renderWithShell(<Probe />);
+    expect(screen.getByText("role:parent")).toBeInTheDocument();
+    cleanup();
+    renderWithShell(<Probe />, { role: null });
+    expect(screen.getByText("role:signed-out")).toBeInTheDocument();
   });
 });
 

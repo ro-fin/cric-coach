@@ -3,30 +3,26 @@
  *
  * `renderWithShell(ui, { role, route })` sets the browser location to `route`
  * (components read `window.location.search`, e.g. the ?ball=N deep link) and
- * wraps `ui` in the shell providers.
- *
- * PROVIDER STATUS: T2's `RoleProvider` (lib/auth/role.tsx) and `ToastProvider`
- * (components/ui) are not on develop yet. Until they land this wrapper is a
- * pass-through and `role` is exposed on `document.documentElement.dataset.role`
- * for components that need it in tests. When F1 lands, T1 replaces
- * `ShellWrapper` with the real providers; callers do not change.
+ * wraps `ui` in the same providers app/layout.tsx uses: T2's RoleProvider
+ * (so `useRole()` answers `role`) and ToastProvider (so `useToast()` works).
+ * The AppShell chrome itself is not rendered: screens are tested in isolation,
+ * and the shell has its own tests.
  */
 
 import { render } from "@testing-library/react";
 import type { RenderOptions, RenderResult } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
+import { ToastProvider } from "@/components/ui/Toast";
+import { RoleProvider } from "@/lib/auth/role";
+import type { Role } from "@/lib/auth/role";
 
-export type Role = "parent" | "coach" | "player";
+export type { Role } from "@/lib/auth/role";
 
 export interface ShellOptions {
-  /** Viewing role; defaults to the admin role so every surface is visible. */
-  role?: Role;
+  /** Viewing role; null renders signed out. Defaults to the admin role so every surface is visible. */
+  role?: Role | null;
   /** Path plus query to set as the current location before rendering. */
   route?: string;
-}
-
-function ShellWrapper({ children }: { children: ReactNode }) {
-  return <>{children}</>;
 }
 
 export function renderWithShell(
@@ -35,6 +31,12 @@ export function renderWithShell(
   options: Omit<RenderOptions, "wrapper"> = {},
 ): RenderResult {
   window.history.replaceState({}, "", route);
-  document.documentElement.dataset.role = role;
+  function ShellWrapper({ children }: { children: ReactNode }) {
+    return (
+      <RoleProvider role={role}>
+        <ToastProvider>{children}</ToastProvider>
+      </RoleProvider>
+    );
+  }
   return render(ui, { ...options, wrapper: ShellWrapper });
 }
