@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canTrigger,
+  formatWhen,
   newestRunId,
   PIPELINE_ROLES,
   sessionIdFromSearch,
@@ -43,5 +44,17 @@ describe("pipeline view model", () => {
     expect(shortDigest(null)).toBe("none");
     expect(shortDigest("sha256:abc")).toBe("sha256:abc");
     expect(shortDigest("sha256:0123456789abcdef0123")).toBe("sha256:0123456789ab…");
+  });
+});
+
+describe("formatWhen", () => {
+  it("says a null timestamp is pending, with an optional word", () => {
+    expect(formatWhen(null)).toBe("not finished");
+    expect(formatWhen(null, "not started")).toBe("not started");
+  });
+
+  it("formats a served timestamp and keeps an unreadable one verbatim", () => {
+    expect(formatWhen("2026-09-27T10:00:00Z")).toMatch(/2026/);
+    expect(formatWhen("yesterday")).toBe("yesterday");
   });
 });

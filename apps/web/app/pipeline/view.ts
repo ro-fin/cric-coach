@@ -39,6 +39,19 @@ export function newestRunId(runs: readonly { id: string }[]): string | null {
   return runs.length === 0 ? null : runs[runs.length - 1].id;
 }
 
+/** A served ISO timestamp in the viewer's locale; null means not finished.
+ * Formatting only: the raw value stays in the <time dateTime> attribute. */
+export function formatWhen(iso: string | null, pending = "not finished"): string {
+  if (iso === null) {
+    return pending;
+  }
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) {
+    return iso;
+  }
+  return at.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
 /** Short digest for a table cell; the full value stays in the title. */
 export function shortDigest(digest: string | null): string {
   if (digest === null) {
