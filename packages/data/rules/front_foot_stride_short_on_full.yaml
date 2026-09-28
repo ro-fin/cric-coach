@@ -1,0 +1,24 @@
+# US-G2 seed rule: the story's flagship example — on full balls outside off,
+# the front-foot lateral step should reach 15-25 cm toward the pitch of the ball.
+rule_key: "front_foot_stride_short_on_full"
+author: "coach"
+approved_by: "coach"
+enabled: true
+rationale: "On a full ball outside off the front foot should step 15 to 25 cm toward the line. Steps shorter than 15 cm leave the bat reaching away from the body and control drops."
+definition:
+  metric: "front_foot_direction_cm"
+  op: "lt"
+  value: 15.0
+  min_n: 10
+  severity: "minor"
+  trigger_share: 0.5
+  condition:
+    line:
+      - "outside_off"
+      - "off"
+    length:
+      - "full"
+  text_data:
+    finding: "Your front foot is stepping straight down the pitch instead of toward the full ball outside off."
+    correction: "Take the front foot to the pitch of the ball so your head and knee finish over it."
+    cue: "Step to the ball, not down the track."

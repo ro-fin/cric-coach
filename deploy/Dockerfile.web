@@ -1,0 +1,13 @@
+# cricAI web provisioning image (Phase-7 fx1, findings 22/29).
+#
+# pnpm is provisioned (version-pinned) at BUILD time via corepack — the old
+# start-command `corepack enable pnpm` fetched pnpm from the npm registry on
+# first use, so an offline container recreation could not even reach
+# `pnpm install`. Node deps still install at container start into the named
+# node_modules volumes (lockfile-pinned; warm volumes make it a no-op).
+# Build once, online:
+#   docker compose -f deploy/docker-compose.yaml build
+FROM node:22-bookworm-slim
+
+# Pin the workspace's pnpm (pnpm-lock.yaml lockfileVersion 9.0).
+RUN corepack enable && corepack prepare pnpm@10.8.1 --activate

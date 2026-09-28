@@ -1,0 +1,23 @@
+# US-G2 seed rule: head stability drops on fuller balls outside off stump.
+rule_key: "head_falls_off_outside_off"
+author: "coach"
+approved_by: "coach"
+enabled: true
+rationale: "When the head falls toward the off side on full balls outside off, the eyes leave the line of the ball and drives lose control. Head stability below 0.6 across most of the zone sample is worth one focused correction."
+definition:
+  metric: "head_stability_score"
+  op: "lt"
+  value: 0.6
+  min_n: 10
+  severity: "major"
+  trigger_share: 0.5
+  condition:
+    line:
+      - "outside_off"
+    length:
+      - "full"
+      - "good"
+  text_data:
+    finding: "Your head is drifting toward the off side on fuller balls outside off stump."
+    correction: "Keep your eyes level and let your head lead your body to the line of the ball."
+    cue: "Nose to the ball, still head at contact."

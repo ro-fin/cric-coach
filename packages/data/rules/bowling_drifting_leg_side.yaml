@@ -1,0 +1,21 @@
+# US-I7 seed rule: line sliding down the leg side.
+rule_key: "bowling_drifting_leg_side"
+author: "coach"
+approved_by: "coach"
+enabled: true
+rationale: "Deliveries that slide down the leg side are glanced away easily and waste the leg-break's shape. Landing leg side on a big share of deliveries is a line problem worth one correction: set the shoulders at the off-stump channel and let the ball work from there."
+definition:
+  metric: "line"
+  op: "eq"
+  value: "leg"
+  min_n: 12
+  severity: "major"
+  trigger_share: 0.3
+  condition:
+    mode:
+      - "bowling"
+  text_data:
+    finding: "Your line is drifting down the leg side."
+    correction: "Line up your run-up and shoulders at off stump and let the ball drift back in, instead of starting it leg side."
+    cue: "Start at off stump and let the ball do the work."
+    drill: "Put a cone on the off-stump line at your target length and start every ball at the cone."

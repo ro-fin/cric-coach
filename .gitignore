@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Node
+node_modules/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+.pnpm-store/
+
+# Env & local
+.env
+.env.local
+*.local.toml
+
+# Data artifacts (object storage lives outside git)
+datasets/demo/
+datasets/**/objects/
+storage/
+*.mp4
+*.mkv
+!tests/fixtures/**/*.mp4
+
+# OS
+.DS_Store
+
+# Playwright
+playwright-report/
+test-results/
+.cricai-run/

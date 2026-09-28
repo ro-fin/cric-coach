@@ -1,0 +1,28 @@
+[project]
+name = "cricai-worker"
+version = "0.1.0"
+description = "RQ workers running the per-session processing DAG"
+requires-python = ">=3.12"
+dependencies = [
+    "rq>=2.1",
+    "redis>=5.2",
+    # Imported directly (stage_adapters imports cv2): declared here so the
+    # contract matches the imports instead of leaning on cricai-vision's
+    # dependency closure (which could move heavy deps behind extras).
+    "opencv-python-headless>=4.10",
+    "cricai-data",
+    "cricai-vision",
+    "cricai-coaching",
+]
+
+[tool.uv.sources]
+cricai-data = { workspace = true }
+cricai-vision = { workspace = true }
+cricai-coaching = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cricai_worker"]

@@ -1,0 +1,20 @@
+# US-G2 seed rule: losing shape against the short ball (late into position).
+rule_key: "late_on_short"
+author: "coach"
+approved_by: "coach"
+enabled: true
+rationale: "Uncontrolled outcomes on short balls usually mean the back-foot move is starting late. Two in five short balls without control is enough signal to spend a block on it."
+definition:
+  metric: "control"
+  op: "eq"
+  value: false
+  min_n: 10
+  severity: "minor"
+  trigger_share: 0.4
+  condition:
+    length:
+      - "short"
+  text_data:
+    finding: "Short balls are hurrying you; a good share of them ended without control."
+    correction: "Get back and across early so the short ball arrives when you are already in position."
+    cue: "Back foot first, eyes level, play it under your nose."

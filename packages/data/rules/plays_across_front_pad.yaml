@@ -1,0 +1,23 @@
+# US-G2 seed rule: bat path swinging across straight balls played off the front foot.
+rule_key: "plays_across_front_pad"
+author: "coach"
+approved_by: "coach"
+enabled: true
+rationale: "A bat path across the line on middle and leg stump front-foot shots closes the face across the front pad. It costs bowled and lbw dismissals and is the classic pattern the straight-bat drill fixes."
+definition:
+  metric: "bat_path"
+  op: "eq"
+  value: "across"
+  min_n: 10
+  severity: "major"
+  trigger_share: 0.5
+  condition:
+    line:
+      - "middle"
+      - "leg"
+    footwork:
+      - "front"
+  text_data:
+    finding: "On straighter balls your bat is swinging across the line in front of your pad."
+    correction: "Show the full face down the pitch and swing from straight back to straight through."
+    cue: "Face to the bowler, swing down one line."

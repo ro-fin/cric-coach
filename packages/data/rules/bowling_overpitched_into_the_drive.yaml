@@ -1,0 +1,21 @@
+# US-I7 seed rule: over-pitching into the half-volley slot.
+rule_key: "bowling_overpitched_into_the_drive"
+author: "coach"
+approved_by: "coach"
+enabled: true
+rationale: "Flight is a leg-spinner's friend, but a ball that lands as a half-volley lets the batter reach the pitch and drive without risk. When nearly half a bowling session lands full, the fix is to keep the shape and pull the landing spot back to a good length."
+definition:
+  metric: "length"
+  op: "eq"
+  value: "full"
+  min_n: 12
+  severity: "minor"
+  trigger_share: 0.45
+  condition:
+    mode:
+      - "bowling"
+  text_data:
+    finding: "Plenty of your deliveries are floating up as half-volleys."
+    correction: "Keep the flight but pull the landing spot back to a good length so the batter cannot reach the pitch of the ball."
+    cue: "Tease the drive, land it just short of it."
+    drill: "Bowl at a target strip set just short of the half-volley zone and count aloud how many land on it."

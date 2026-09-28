@@ -1,0 +1,16 @@
+# cricAI worker provisioning image (Phase-7 fx1, findings 3/22/29).
+#
+# ffmpeg (clip cutting, US-D2) is baked at BUILD time so recreating the
+# container on an offline LAN box never re-runs `apt-get update` — the old
+# start-command apt install crash-looped the worker after any power cycle
+# with no upstream internet (restart: unless-stopped retried forever).
+#
+# Python deps still `uv sync --frozen` at container start into the named
+# /opt/venv volume (lockfile-pinned; a warm volume makes the sync a no-op,
+# so steady-state recreation is network-free). Build once, online:
+#   docker compose -f deploy/docker-compose.yaml build
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*

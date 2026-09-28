@@ -1,0 +1,21 @@
+# US-I7 seed rule: pushing the ball through flat instead of giving it air.
+rule_key: "bowling_pushing_pace_flat"
+author: "coach"
+approved_by: "coach"
+enabled: true
+rationale: "Pushing the ball through flat and quick robs a young leg-spinner of the loop that creates dip and turn. The speed threshold is a coach-set starting point for this age group and can be adjusted per player with a rule override."
+definition:
+  metric: "speed_kph"
+  op: "gt"
+  value: 85
+  min_n: 10
+  severity: "minor"
+  trigger_share: 0.6
+  condition:
+    mode:
+      - "bowling"
+  text_data:
+    finding: "Most of your deliveries are being pushed through flat and quick."
+    correction: "Take a breath, get the ball up above the batter's eyes and trust the flight to beat the bat."
+    cue: "Big shape over the bat, let it dip."
+    drill: "Bowl a block where every delivery must travel above eye level on its way down the pitch."

@@ -1,0 +1,17 @@
+# cricAI api provisioning image (Phase-7 fx1, findings 3/22/29).
+#
+# The api container executes upload probing (ffprobe) and the pipeline DAG's
+# clip-cutting stage (ffmpeg) IN-PROCESS (apps/api/src/cricai_api/routers/
+# pipeline.py runs the DAG synchronously), so it needs ffmpeg exactly like
+# the worker — and it must be baked at BUILD time: recreating a container on
+# an offline LAN box must never crash-loop on `apt-get update`.
+#
+# Python deps still `uv sync --frozen` at container start into the named
+# /opt/venv volume (lockfile-pinned; a warm volume makes the sync a no-op,
+# so steady-state recreation is network-free). Build once, online:
+#   docker compose -f deploy/docker-compose.yaml build
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*

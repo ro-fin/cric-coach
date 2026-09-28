@@ -1,0 +1,25 @@
+[project]
+name = "cricai-vision"
+version = "0.1.0"
+description = "Calibration, ball-event detection, pose, tracking and overlays for the AI cricket lab"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.0",
+    "opencv-python-headless>=4.10",
+    "matplotlib>=3.9",
+    "cricai-data",
+]
+
+[project.optional-dependencies]
+pose = ["mediapipe>=0.10"]
+detect = ["ultralytics>=8.3"]
+
+[tool.uv.sources]
+cricai-data = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cricai_vision"]

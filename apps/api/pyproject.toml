@@ -1,0 +1,33 @@
+[project]
+name = "cricai-api"
+version = "0.1.0"
+description = "FastAPI service: sessions, videos, tags, calibration, reports"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "sqlalchemy>=2.0",
+    "alembic>=1.14",
+    "psycopg[binary]>=3.2",
+    "pydantic-settings>=2.7",
+    "python-multipart>=0.0.20",
+    # Imported directly (services/report_export renders PDF/PNG via the Agg
+    # backend): declared here so the contract matches the imports instead of
+    # leaning on cricai-vision's dependency closure.
+    "matplotlib>=3.9",
+    "cricai-data",
+    "cricai-vision",
+    "cricai-coaching",
+]
+
+[tool.uv.sources]
+cricai-data = { workspace = true }
+cricai-vision = { workspace = true }
+cricai-coaching = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cricai_api"]

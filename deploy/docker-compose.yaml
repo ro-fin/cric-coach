@@ -1,0 +1,216 @@
+# cricAI LAN stack (US-L3 local-first; Phase-7 plan, design milestone 6).
+#
+# STATUS: AUTHORED + CONFIG-VALIDATED, NOT YET RUN ON THE LAB BOX — local
+# Docker is broken there (design milestone 6), so the VERIFIED deployment
+# path is scripts/deploy_local.sh (process-based). This file is linted by
+# packages/data/tests/test_compose_config.py (pure-Python YAML lint; no
+# docker invocation) so it cannot rot silently.
+#
+# Environment: docker compose loads deploy/.env automatically (the project
+# directory is this file's directory). Copy deploy/.env.example -> deploy/.env
+# first; required values fail interpolation loudly via the ":?" form.
+#
+# Provisioning images (Phase-7 fx1, findings 3/22/29): api/worker/web build
+# a small local image each (deploy/Dockerfile.{api,worker,web}) that bakes
+# the SYSTEM provisioning — ffmpeg for api AND worker (the api runs upload
+# probing + the pipeline DAG in-process), a pinned pnpm for web — at BUILD
+# time, so recreating a container on an offline LAN box never crash-loops on
+# apt/corepack. Build once (online): `docker compose -f deploy/... build`.
+#
+# The repo itself is bind-mounted and the api/worker services sync their OWN
+# container venvs (UV_PROJECT_ENVIRONMENT=/opt/venv, a named volume) so the
+# host .venv is never clobbered with Linux binaries; a warm volume makes the
+# start-time `uv sync --frozen` an offline no-op. The web service likewise
+# keeps node_modules/.next in named volumes.
+#
+# BUILD-TIME INLINING CAVEAT (web): Next.js inlines NEXT_PUBLIC_* at
+# `pnpm build`. The web service builds at container start from the current
+# env, so changing NEXT_PUBLIC_* means:
+#   docker compose up -d --force-recreate web
+
+name: cricai
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${CRICAI_POSTGRES_USER:-cricai}
+      POSTGRES_PASSWORD: ${CRICAI_POSTGRES_PASSWORD:?set in deploy/.env}
+      POSTGRES_DB: ${CRICAI_POSTGRES_DB:-cricai}
+    volumes:
+      - cricai-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${CRICAI_POSTGRES_USER:-cricai} -d ${CRICAI_POSTGRES_DB:-cricai}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    # ffmpeg is baked into the image (Dockerfile.api): the api executes
+    # upload probing (ffprobe) and the pipeline DAG's clip stage (ffmpeg)
+    # IN-PROCESS — without it every upload finalize and pipeline run fails
+    # while the /health healthcheck stays green (finding 3).
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: cricai-api:local
+    restart: unless-stopped
+    working_dir: /app
+    command:
+      - sh
+      - -c
+      - >
+        uv sync --all-packages --frozen &&
+        uv run alembic -c packages/data/alembic.ini upgrade head &&
+        uv run uvicorn cricai_api.app:create_app --factory
+        --host 0.0.0.0 --port 8000
+    environment:
+      UV_PROJECT_ENVIRONMENT: /opt/venv
+      CRICAI_DATABASE_URL: postgresql+psycopg://${CRICAI_POSTGRES_USER:-cricai}:${CRICAI_POSTGRES_PASSWORD:?set in deploy/.env}@postgres:5432/${CRICAI_POSTGRES_DB:-cricai}
+      CRICAI_STORAGE_ROOT: /data/storage
+      CRICAI_PARENT_TOKEN: ${CRICAI_PARENT_TOKEN:?set in deploy/.env}
+      CRICAI_COACH_TOKEN: ${CRICAI_COACH_TOKEN:?set in deploy/.env}
+      CRICAI_PLAYER_TOKEN: ${CRICAI_PLAYER_TOKEN:?set in deploy/.env}
+      # Optional (finding 4): MediaPipe pose landmarker .task path AS SEEN BY
+      # THE CONTAINER (repo mounted at /app). Unset = deterministic fake pose
+      # provider — see deploy/.env.example for the consequences.
+      CRICAI_POSE_MODEL_ASSET: ${CRICAI_POSE_MODEL_ASSET:-}
+    volumes:
+      - ..:/app
+      - cricai-api-venv:/opt/venv
+      - cricai-storage:/data/storage
+    ports:
+      - "${CRICAI_API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # stdlib-only probe: urlopen raises (non-zero exit) on any non-2xx.
+      test:
+        [
+          "CMD-SHELL",
+          "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)\"",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 600s # first boot: uv sync + migrations
+
+  worker:
+    # RQ worker draining the ${CRICAI_RQ_QUEUE:-cricai} queue
+    # (cricai_worker.pipeline.run_session_pipeline_job). Scheduled jobs
+    # (US-J4/G5/L4/J5) run IN THIS CONTAINER via host cron:
+    #   docker compose -f deploy/docker-compose.yaml exec -T worker \
+    #     uv run python scripts/run_scheduled.py nightly
+    # (crontab lines: docs/runbooks/deploy_lan.md)
+    # ffmpeg is baked into the image (Dockerfile.worker, finding 22): the old
+    # start-command apt install crash-looped the worker on any offline
+    # container recreation (power cycle at the ground, no upstream internet).
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    image: cricai-worker:local
+    restart: unless-stopped
+    working_dir: /app
+    command:
+      - sh
+      - -c
+      - >
+        uv sync --all-packages --frozen &&
+        uv run rq worker ${CRICAI_RQ_QUEUE:-cricai} --url "$$CRICAI_REDIS_URL"
+    environment:
+      UV_PROJECT_ENVIRONMENT: /opt/venv
+      CRICAI_DATABASE_URL: postgresql+psycopg://${CRICAI_POSTGRES_USER:-cricai}:${CRICAI_POSTGRES_PASSWORD:?set in deploy/.env}@postgres:5432/${CRICAI_POSTGRES_DB:-cricai}
+      CRICAI_REDIS_URL: redis://redis:6379/0
+      CRICAI_STORAGE_ROOT: /data/storage
+      # Optional (finding 4): container path of the MediaPipe pose landmarker
+      # .task bundle; unset = deterministic fake pose provider (documented in
+      # deploy/.env.example).
+      CRICAI_POSE_MODEL_ASSET: ${CRICAI_POSE_MODEL_ASSET:-}
+    volumes:
+      - ..:/app
+      - cricai-worker-venv:/opt/venv
+      - cricai-storage:/data/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/venv/bin/python -c \"import os, redis; redis.Redis.from_url(os.environ['CRICAI_REDIS_URL']).ping()\"",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 600s # first boot: uv sync (ffmpeg is baked at build)
+
+  web:
+    # pnpm is baked into the image (Dockerfile.web, finding 29): the old
+    # start-command `corepack enable pnpm` fetched pnpm from the npm registry
+    # on first use, so an offline container recreation could not even reach
+    # `pnpm install`.
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    image: cricai-web:local
+    restart: unless-stopped
+    working_dir: /app
+    # Builds at start so NEXT_PUBLIC_* reflect the CURRENT env (see the
+    # build-time inlining caveat in the header comment).
+    command:
+      - sh
+      - -c
+      - >
+        pnpm install --frozen-lockfile &&
+        pnpm --dir apps/web build &&
+        pnpm --dir apps/web start -- -p 3000 -H 0.0.0.0
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:?set in deploy/.env}
+      NEXT_PUBLIC_API_TOKEN: ${NEXT_PUBLIC_API_TOKEN:?set in deploy/.env}
+      NEXT_PUBLIC_CRICAI_MEDIA_BASE: ${NEXT_PUBLIC_CRICAI_MEDIA_BASE:?set in deploy/.env}
+    volumes:
+      - ..:/app
+      - cricai-web-root-modules:/app/node_modules
+      - cricai-web-app-modules:/app/apps/web/node_modules
+      - cricai-web-next:/app/apps/web/.next
+    ports:
+      - "${CRICAI_WEB_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:3000/').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 600s # first boot: pnpm install + next build
+
+volumes:
+  cricai-pgdata:
+  cricai-storage:
+  cricai-api-venv:
+  cricai-worker-venv:
+  cricai-web-root-modules:
+  cricai-web-app-modules:
+  cricai-web-next:

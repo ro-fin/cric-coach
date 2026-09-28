@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cricai://schemas/ball_record-v1.json",
+  "title": "BallRecord v1 (v1.1)",
+  "description": "Canonical per-ball record (US-G1): one versioned JSON shape every producer (manual tags, CV pipeline) and consumer (agents, dashboard) shares. Flat identity/context/delivery/technique/outcome fields plus per-field confidence, provenance (source), null reasons and per-camera clip links. v1.1 (US-I2/I3/I4/I6) adds ten OPTIONAL leg-spin bowling fields (release_height_cm, release_frame_offset, brace_state, falling_away_deg, turn_cm, apex_m, dip_flag, variation_intent, variation_detected, target_hit) — populated only for mode=='bowling' records, all nullable-with-reason. They are NOT in 'required' so a v1.0 record still validates; additionalProperties stays true so v1 readers tolerate additive MINOR versions; consumers reject unknown MAJOR versions.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema_version",
+    "ball_id",
+    "session_id",
+    "block_id",
+    "mode",
+    "bowler",
+    "speed_kph",
+    "line",
+    "length",
+    "bounce_xy",
+    "shot",
+    "footwork",
+    "front_foot_direction_cm",
+    "head_stability_score",
+    "bat_path",
+    "contact_quality",
+    "outcome",
+    "control",
+    "confidence",
+    "source",
+    "reasons",
+    "clips"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^1\\.[0-9]+$"
+    },
+    "ball_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "session_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "block_id": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "mode": {
+      "enum": ["batting", "bowling", null]
+    },
+    "bowler": {
+      "enum": ["machine", "human", "coach", null]
+    },
+    "speed_kph": {
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "line": {
+      "enum": ["outside_off", "off", "middle", "leg", null]
+    },
+    "length": {
+      "enum": ["yorker", "full", "good", "short", null]
+    },
+    "bounce_xy": {
+      "type": ["array", "null"],
+      "items": {"type": "number"},
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "shot": {
+      "enum": [
+        "leave",
+        "defend",
+        "drive",
+        "cover_drive",
+        "straight_drive",
+        "on_drive",
+        "cut",
+        "pull",
+        "hook",
+        "sweep",
+        "flick",
+        "loft",
+        null
+      ]
+    },
+    "footwork": {
+      "enum": ["front", "back", "leave", null]
+    },
+    "front_foot_direction_cm": {
+      "type": ["number", "null"]
+    },
+    "head_stability_score": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "bat_path": {
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "contact_quality": {
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "outcome": {
+      "enum": [
+        "controlled_ground_shot",
+        "controlled_aerial",
+        "uncontrolled",
+        "beaten",
+        "bowled",
+        "edged",
+        "left_alone",
+        null
+      ]
+    },
+    "control": {
+      "type": ["boolean", "null"]
+    },
+    "confidence": {
+      "type": "object",
+      "additionalProperties": {"type": "number", "minimum": 0, "maximum": 1}
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": {"type": "string", "minLength": 1}
+    },
+    "reasons": {
+      "type": "object",
+      "additionalProperties": {"type": "string", "minLength": 1}
+    },
+    "clips": {
+      "type": "object",
+      "additionalProperties": {"type": "string", "minLength": 1}
+    },
+    "release_height_cm": {
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "release_frame_offset": {
+      "type": ["integer", "null"]
+    },
+    "brace_state": {
+      "enum": ["braced", "bent", "collapsed", null]
+    },
+    "falling_away_deg": {
+      "type": ["number", "null"]
+    },
+    "turn_cm": {
+      "type": ["number", "null"]
+    },
+    "apex_m": {
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "dip_flag": {
+      "type": ["boolean", "null"]
+    },
+    "variation_intent": {
+      "enum": ["leg_break", "top_spinner", "googly", "slider", "flipper", "unknown", null]
+    },
+    "variation_detected": {
+      "enum": ["leg_break", "top_spinner", "googly", "slider", "flipper", "unknown", null]
+    },
+    "target_hit": {
+      "type": ["boolean", "null"]
+    }
+  }
+}

@@ -1,0 +1,25 @@
+# US-G2 seed rule: outside edges against the ball leaving the bat (machine leg-spin feeds).
+rule_key: "weak_against_spin_turning_away"
+author: "coach"
+approved_by: "coach"
+enabled: true
+rationale: "Against machine feeds that turn away outside off, repeated outside edges mean the hands are chasing the ball after it grips. Three in ten edged contacts in that zone earns a dedicated leave-or-smother block."
+definition:
+  metric: "contact_quality"
+  op: "eq"
+  value: "edge"
+  min_n: 12
+  severity: "minor"
+  trigger_share: 0.3
+  condition:
+    line:
+      - "outside_off"
+    length:
+      - "full"
+      - "good"
+    bowler:
+      - "machine"
+  text_data:
+    finding: "The ball turning away outside off is finding your outside edge too often."
+    correction: "Play the turn late and under your eyes, or let the wide ones go through."
+    cue: "Wait for it to turn, then play it or leave it."

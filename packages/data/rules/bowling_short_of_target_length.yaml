@@ -1,0 +1,21 @@
+# US-I7 seed rule: too many deliveries dropping short of the target length.
+rule_key: "bowling_short_of_target_length"
+author: "coach"
+approved_by: "coach"
+enabled: true
+rationale: "A leg-break that lands short sits up and gives the batter time to play the turn off the pitch. When a large share of a bowling session drops short of the target length, one focused correction on landing the ball fuller is worth the whole session."
+definition:
+  metric: "length"
+  op: "eq"
+  value: "short"
+  min_n: 12
+  severity: "major"
+  trigger_share: 0.4
+  condition:
+    mode:
+      - "bowling"
+  text_data:
+    finding: "A lot of your deliveries are landing short of the target length."
+    correction: "Give the ball more flight and land it fuller, on the length you picked before the ball."
+    cue: "Up and over - land it on the coin."
+    drill: "Lay a marker sheet on a good length and bowl a whole block trying to land every ball on it."
